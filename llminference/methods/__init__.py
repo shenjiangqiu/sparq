@@ -2,6 +2,7 @@
 
 from . import (  # noqa: F401
     ann_attention,
+    exp_attention,
     eviction_attention,
     quantisation,
     sparse_attention,

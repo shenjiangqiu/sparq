@@ -23,7 +23,13 @@ from transformers.models.llama.modeling_llama import LlamaForCausalLM
 from transformers.models.mistral.modeling_mistral import MistralForCausalLM
 
 from . import eval_adapter, utility
-from .methods import ann_attention, eviction_attention, sparse_attention
+from .methods import (
+    ann_attention,
+    eviction_attention,
+    sparse_attention,
+    exp_attention,
+    alisa_attention,
+)
 from .models import pipelined_models
 from .tasks import bpc, needle, qa, repetition, summarisation
 
@@ -142,6 +148,16 @@ class SparsityMethods:
         return sparse_attention.convert(
             model, sparse_attention.SparseSettings(**settings)
         )
+
+    @staticmethod
+    def exp(model: PreTrainedModel, **settings: Any) -> PreTrainedModel:
+        assert isinstance(model, MODELS)
+        return exp_attention.convert(model, exp_attention.Settings(**settings))
+
+    @staticmethod
+    def alisa(model: PreTrainedModel, **settings: Any) -> PreTrainedModel:
+        assert isinstance(model, MODELS)
+        return alisa_attention.convert(model, alisa_attention.Settings(**settings))
 
     @staticmethod
     def local(model: PreTrainedModel, **settings: Any) -> PreTrainedModel:
