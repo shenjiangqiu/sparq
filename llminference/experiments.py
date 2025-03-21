@@ -56,6 +56,7 @@ TASKS = (
     "squad_train",
     "cnn_dailymail",
     "wikitext_bpc",
+    "alpaca_bpc",
     "repetition",
     "needle",
 )
@@ -212,6 +213,11 @@ def _evaluate(
     elif task.name == "wikitext_bpc":
         assert task.shots == 0 and task.confusion_contexts == 0
         data = bpc.WikiText.data()
+        examples = [data[i] for i in range(task.samples)]
+        evaluate_fn = bpc.evaluate
+    elif task.name == "alpaca_bpc":
+        assert task.shots == 0 and task.confusion_contexts == 0
+        data = bpc.Alpaca.data()
         examples = [data[i] for i in range(task.samples)]
         evaluate_fn = bpc.evaluate
     elif task.name == "repetition":

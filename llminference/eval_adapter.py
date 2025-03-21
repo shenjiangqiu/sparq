@@ -491,6 +491,7 @@ class Adapter:
             )
             reference_length = reference_enc["input_ids"].shape[-1]
             if reference_length > max_reference_tokens:
+                print("reference_length", len(reference[0]))
                 raise ValueError(
                     "Reference string exceeds max_reference_tokens"
                     f"={max_reference_tokens}, reference: {reference}"

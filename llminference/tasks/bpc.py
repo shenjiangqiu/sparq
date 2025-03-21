@@ -33,6 +33,55 @@ from ..eval_adapter import Adapter, ModelContext
 from ..utility import AnyDict
 
 
+def compose_text(d):
+    return f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+### Instruction:
+{d["instruction"]}
+
+### Input:
+{d["input"]}
+
+### Response:
+{d["output"]}
+"""
+
+
+def map_dataset2(input: Dict[str, Any]) -> Dict[str, Any]:
+    text = compose_text(input)
+    # split prefill before ### Response:
+    # assert False
+    prefill_index = text.find("### Response:")
+    prefill = text[:prefill_index]
+    reference = text[prefill_index : prefill_index + 400]
+    print(len(reference))
+    return {"prefill": prefill, "reference": reference}
+    # None
+    pass
+
+
+class Alpaca:
+    """Filtered version of wikitext-103-v1 (training set) from HuggingFace
+    EleutherAI/wikitext_document_level"""
+
+    @classmethod
+    def data(
+        cls,
+        shuffle_seed: int = 2353669,
+        prefill_len: int = 6000,
+        reference_len: int = 400,
+    ) -> datasets.Dataset:
+        ds = datasets.load_dataset("yahma/alpaca-cleaned")
+        print("mapping!!!------------------")
+        ds_mapped = ds.map(
+            map_dataset2, batched=False, remove_columns=ds["train"].column_names
+        )["train"]
+        for i in range(100):
+            print("------")
+            print(ds_mapped[i]["reference"])
+        return ds_mapped
+
+
 class WikiText:
     """Filtered version of wikitext-103-v1 (training set) from HuggingFace
     EleutherAI/wikitext_document_level"""

@@ -226,6 +226,11 @@ class AlisaAttention(nn.Module):
         """
 
         sparsity = self.settings.score.sparsity
+        valid_part = 1 - sparsity
+        valid_len = int(valid_part * key.shape[-2])
+        if valid_len % 2 == 1:
+            valid_len += 1
+        
         batch, n_kv_heads, seq, head_size = key.shape
         n_heads_per_kv = query.shape[1] // n_kv_heads
 
@@ -251,11 +256,14 @@ class AlisaAttention(nn.Module):
         #     dim=2, keepdim=True
         # )
         # Find max-score keys (note: +1 because the current token's k comes "for free")
+        half_valid_len = int(valid_len / 2)
+        valid_len_int = int(valid_len)
+        # print("valid len: ", valid_len_int)
         last_weight_sum = last_weight.sum(-2, keepdim=True)
-        last_weight_sum[:, :, :, -40:] += 1
-        indices = last_weight_sum.topk(80, dim=-1).indices
-        print("indices_shape: ", indices.shape)
-        print("indices: ", indices[0, 0])
+        last_weight_sum[:, :, :, -half_valid_len:] += 1
+        indices = last_weight_sum.topk(valid_len_int, dim=-1).indices 
+        # print("indices_shape: ", indices.shape)
+        # print("indices: ", indices[0, 0])
         # if self.debug_indices is not None:
         #     self.debug_indices.append(indices)
 
@@ -303,7 +311,7 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         utility.check_transformers_version(type(self))
         super().__init__(config)
         self.expatt = AlisaAttention(settings, self.num_attention_heads, self.head_size)
-        print("Using AlisaAttention init!")
+        # print("Using AlisaAttention init!")
         self.weights = None
         self.last_score = settings.score.last_score
 
@@ -315,10 +323,10 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         attention_mask: Optional[Tensor] = None,
         head_mask: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor]:
-        print("Using AlisaAttention _attn!")
-        print("query shape: ", query.shape)
-        print("key shape: ", key.shape)
-        print("value shape: ", value.shape)
+        # print("Using AlisaAttention _attn!")
+        # print("query shape: ", query.shape)
+        # print("key shape: ", key.shape)
+        # print("value shape: ", value.shape)
 
         assert attention_mask is not None
         assert head_mask is None
@@ -332,7 +340,7 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
                 attention_mask.broadcast_to(key.unsqueeze(-3).shape[:-1]),
                 last_weight=self.weights,
             )
-            print("weight_shape: ", weight.shape)
+            # print("weight_shape: ", weight.shape)
             current_size = self.weights.shape[-1]
             target_size = weight.shape[-1]
 
@@ -343,17 +351,17 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
             self.weights = torch.cat(
                 [self.weights[:, :, 1:, :], weight.clone()], dim=-2
             )
-            print("self.weights_shape: ", self.weights.shape)
+            # print("self.weights_shape: ", self.weights.shape)
             weight_sum = self.weights.sum(dim=-1)
-            print("weightsum:", weight_sum[0, 0])
+            # print("weightsum:", weight_sum[0, 0])
             return output, weight
         else:
             output, weight = super()._attn(  # type:ignore[no-any-return]
                 query, key, value, attention_mask, head_mask
             )
-            print("weight_shape: ", weight.shape)
+            # print("weight_shape: ", weight.shape)
             self.weights = weight[:, :, -self.last_score :, :].clone()
-            print("self.weights_shape: ", self.weights.shape)
+            # print("self.weights_shape: ", self.weights.shape)
             return output, weight
 
 
