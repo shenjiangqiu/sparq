@@ -1,3 +1,4 @@
-[submodule "transformers_sjq"]
-	path = transformers_sjq
+[submodule "transformers"]
+	path = transformers
 	url = https://github.com/shenjiangqiu/transformers.git
+	branch = sjq_4_40

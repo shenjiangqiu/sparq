@@ -122,6 +122,7 @@ class Settings:
     k: int
     local_k: int
     reallocate_to_mean_value: bool
+    sparsity: float
     score: ScoreSettings
 
     def __init__(
@@ -129,6 +130,7 @@ class Settings:
         k: int,
         local_k: int,
         reallocate_to_mean_value: bool,
+        sparsity: float,
         score: Union[ScoreSettings, str],
         **args: Any,
     ):
@@ -144,6 +146,7 @@ class Settings:
             score_settings = score
         self.k = k
         self.local_k = local_k
+        self.sparsity = sparsity
         self.reallocate_to_mean_value = reallocate_to_mean_value
         self.score = score_settings
 
@@ -232,16 +235,24 @@ class AnnAttention(nn.Module):
         # Calculate an approximate score for each (query, key) pair
         # shape -- (batch, n_kv_heads, n_heads_per_kv, 1, seq)
         score = (self.score(query, key) + logmask).float()
+        seq_len = key.shape[-2]
 
+        sparsity = self.settings.sparsity
+        valid_len = int((1 - sparsity) * seq_len)
+        if valid_len % 2 == 1:
+            valid_len += 1
+        half_valid_len = int(valid_len / 2)
         # Set the score of local keys (+1 current) to max
         causal_index = sparse_attention.causal_index(logmask)
-        is_local = (0 <= causal_index) & (causal_index < self.settings.local_k + 1)
+        is_local = (0 <= causal_index) & (causal_index < half_valid_len + 1)
         topk_score = score.masked_fill(is_local, torch.finfo(score.dtype).max).sum(
             dim=2, keepdim=True
         )
+        print("half_valid_len", half_valid_len)
+        print("valid_len", valid_len)
         # Find max-score keys (note: +1 because the current token's k comes "for free")
         indices = topk_score.topk(
-            min(self.settings.k + 1, score.shape[-1]), -1
+            min(valid_len, score.shape[-1]), -1
         ).indices  # (batch, n_kv_heads, 1, 1, k+1)
         if self.debug_indices is not None:
             self.debug_indices.append(indices)

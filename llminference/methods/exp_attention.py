@@ -132,6 +132,7 @@ class Settings:
     k: int
     local_k: int
     reallocate_to_mean_value: bool
+    sparsity: float
     score: ScoreSettings
 
     def __init__(
@@ -139,6 +140,7 @@ class Settings:
         k: int,
         local_k: int,
         reallocate_to_mean_value: bool,
+        sparsity: float,
         score: Union[ScoreSettings, str],
         **args: Any,
     ):
@@ -153,6 +155,7 @@ class Settings:
         self.k = k
         self.local_k = local_k
         self.reallocate_to_mean_value = reallocate_to_mean_value
+        self.sparsity = sparsity
         self.score = score_settings
 
 
@@ -239,16 +242,22 @@ class ExpAttention(nn.Module):
         # Calculate an approximate score for each (query, key) pair
         # shape -- (batch, n_kv_heads, n_heads_per_kv, 1, seq)
         score = (self.score(query, key) + logmask).float()
-
+        seq_len = key.shape[-2]
+        valid_len = int((1 - self.settings.sparsity) * seq_len)
+        if valid_len % 2 == 1:
+            valid_len += 1
+        half_valid_len = valid_len // 2
+        print("half_valid_len", half_valid_len)
         # Set the score of local keys (+1 current) to max
         causal_index = sparse_attention.causal_index(logmask)
-        is_local = (0 <= causal_index) & (causal_index < self.settings.local_k + 1)
+
+        is_local = (0 <= causal_index) & (causal_index < half_valid_len + 1)
         topk_score = score.masked_fill(is_local, torch.finfo(score.dtype).max).sum(
             dim=2, keepdim=True
         )
         # Find max-score keys (note: +1 because the current token's k comes "for free")
         indices = topk_score.topk(
-            min(self.settings.k + 1, score.shape[-1]), -1
+            min(valid_len, score.shape[-1]), -1
         ).indices  # (batch, n_kv_heads, 1, 1, k+1)
         if self.debug_indices is not None:
             self.debug_indices.append(indices)
@@ -299,6 +308,7 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         utility.check_transformers_version(type(self))
         super().__init__(config)
         self.expatt = ExpAttention(settings, self.num_attention_heads, self.head_size)
+
     def _attn(
         self,
         query: Tensor,
@@ -318,22 +328,22 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         )
         # Only enable ANN during autoregressive generation
         if query.shape[-2] == 1:
-            output,weight = self.expatt(  # type:ignore[no-any-return]
+            output, weight = self.expatt(  # type:ignore[no-any-return]
                 query,
                 key,
                 value,
                 attention_mask.broadcast_to(key.unsqueeze(-3).shape[:-1]),
             )
             # concat the weights
-            print("weight",weight.shape)
-            return output,weight
+            print("weight", weight.shape)
+            return output, weight
 
-        output,weights =  super()._attn(  # type:ignore[no-any-return]
+        output, weights = super()._attn(  # type:ignore[no-any-return]
             query, key, value, attention_mask, head_mask
         )
         # self.last_weight = weights
-        print("weight",weights.shape)
-        return output,weights
+        print("weight", weights.shape)
+        return output, weights
 
 
 class LlamaAttentionWithANN(llama_attention.LlamaAttention):
