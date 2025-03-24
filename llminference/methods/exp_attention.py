@@ -30,8 +30,8 @@ from . import sparse_attention
 
 def gather(t: Tensor, dim: int, i: Tensor) -> Tensor:
     """A broadcasting version of torch.gather."""
-    print(dim)
-    print(i.shape)
+    # print(dim)
+    # print(i.shape)
     dim += (dim < 0) * t.ndim
     return t.gather(dim, i.expand(*t.shape[:dim], i.shape[dim], *t.shape[dim + 1 :]))
 
@@ -247,7 +247,7 @@ class ExpAttention(nn.Module):
         if valid_len % 2 == 1:
             valid_len += 1
         half_valid_len = valid_len // 2
-        print("half_valid_len", half_valid_len)
+        # print("half_valid_len", half_valid_len)
         # Set the score of local keys (+1 current) to max
         causal_index = sparse_attention.causal_index(logmask)
 
@@ -304,7 +304,7 @@ Model = Union[
 
 class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
     def __init__(self, config: GPTNeoXConfig, settings: Settings):
-        print("GPTNeoXAttentionWithANN")
+        # print("GPTNeoXAttentionWithANN")
         utility.check_transformers_version(type(self))
         super().__init__(config)
         self.expatt = ExpAttention(settings, self.num_attention_heads, self.head_size)
@@ -319,7 +319,7 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
     ) -> Tuple[Tensor, Tensor]:
         assert attention_mask is not None
         assert head_mask is None
-        print(
+        # print(
             "GPTNeoXAttentionWithANN._attn",
             query.shape,
             key.shape,
@@ -335,14 +335,14 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
                 attention_mask.broadcast_to(key.unsqueeze(-3).shape[:-1]),
             )
             # concat the weights
-            print("weight", weight.shape)
+            # print("weight", weight.shape)
             return output, weight
 
         output, weights = super()._attn(  # type:ignore[no-any-return]
             query, key, value, attention_mask, head_mask
         )
         # self.last_weight = weights
-        print("weight", weights.shape)
+        # print("weight", weights.shape)
         return output, weights
 
 

@@ -220,6 +220,11 @@ def _evaluate(
         data = bpc.Alpaca.data()
         examples = [data[i] for i in range(task.samples)]
         evaluate_fn = bpc.evaluate
+    elif task.name == "pnn_bpc":
+        assert task.shots == 0 and task.confusion_contexts == 0
+        data = bpc.Alpaca.data()
+        examples = [data[i] for i in range(task.samples)]
+        evaluate_fn = bpc.evaluate
     elif task.name == "repetition":
         assert task.shots == 0 and task.confusion_contexts == 0
         data = repetition.Shakespeare.data()

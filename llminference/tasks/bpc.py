@@ -54,7 +54,7 @@ def map_dataset2(input: Dict[str, Any]) -> Dict[str, Any]:
     prefill_index = text.find("### Response:")
     prefill = text[:prefill_index]
     reference = text[prefill_index : prefill_index + 400]
-    print(len(reference))
+    # print(len(reference))
     return {"prefill": prefill, "reference": reference}
     # None
     pass
@@ -71,14 +71,16 @@ class Alpaca:
         prefill_len: int = 6000,
         reference_len: int = 400,
     ) -> datasets.Dataset:
-        ds = datasets.load_dataset("yahma/alpaca-cleaned")
-        print("mapping!!!------------------")
-        ds_mapped = ds.map(
-            map_dataset2, batched=False, remove_columns=ds["train"].column_names
-        )["train"]
-        for i in range(100):
-            print("------")
-            print(ds_mapped[i]["reference"])
+        ds = datasets.load_dataset("yahma/alpaca-cleaned")["train"]
+        # print("mapping!!!------------------")
+        ds_mapped = ds.filter(
+            lambda example, idx: len(compose_text(example)) > 6400
+        ).map(map_dataset2, batched=False, remove_columns=ds["train"].column_names)[
+            "train"
+        ]
+        # for i in range(100):
+        #     print("------")
+        #     print(ds_mapped[i]["reference"])
         return ds_mapped
 
 
@@ -123,6 +125,54 @@ class WikiText:
             datasets.load_dataset(
                 "EleutherAI/wikitext_document_level",
                 "wikitext-103-raw-v1",
+                trust_remote_code=True,
+            )["train"],
+            partial(
+                cls.preprocess, prefill_len=prefill_len, reference_len=reference_len
+            ),
+        ).shuffle(shuffle_seed)
+
+
+class PnnTree:
+    """Filtered version of wikitext-103-v1 (training set) from HuggingFace
+    EleutherAI/wikitext_document_level"""
+
+    @staticmethod
+    def preprocess(
+        d: Dict[str, Any], prefill_len: int, reference_len: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate a summarisation example from wikitext-103-v1.
+
+        Examples will be split into "prefill" and "reference" sub-strings, where the
+        prefill ends just before the first whitespace character occurring after
+        `prefill_len` characters, and the reference string ends just before the first
+        whitespace character or end-of-line occurring after `reference_len` characters.
+        Should the dataset string not match this format, it will be filtered out
+        (i.e. nothing returned here).
+
+        Yields: {"prefill": str, "reference": str}
+        """
+        # Explanation of regex: https://regex101.com/r/yigOBu/1
+        # (note: {{{ in the f-string should be read as { in the regex)
+        filter_regex = rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len-1}}}.*?)(?:\s|$)"
+        m = re.search(filter_regex, d["page"], flags=re.S)
+        if m:
+            assert len(m.groups()) == 2, (
+                "WikiText filter regex should always have 2 groups,"
+                f"but has {len(m.groups())} on string '{d['page']}'"
+            )
+            return dict(prefill=m.group(1), reference=m.group(2))
+
+    @classmethod
+    def data(
+        cls,
+        shuffle_seed: int = 2353669,
+        prefill_len: int = 6000,
+        reference_len: int = 400,
+    ) -> datasets.Dataset:
+        return utility.map_and_filter(
+            datasets.load_dataset(
+                "ptb-text-only/ptb_text_only",
                 trust_remote_code=True,
             )["train"],
             partial(

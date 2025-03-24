@@ -52,7 +52,7 @@ sparsity = [
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dtype = "float16" if device == "cuda" else "float32"
 print(device)
-
+results = []
 for m in models:
     for d in datasets:
         for s_num in sparsity_num:

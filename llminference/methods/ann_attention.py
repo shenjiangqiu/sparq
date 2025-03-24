@@ -248,8 +248,8 @@ class AnnAttention(nn.Module):
         topk_score = score.masked_fill(is_local, torch.finfo(score.dtype).max).sum(
             dim=2, keepdim=True
         )
-        print("half_valid_len", half_valid_len)
-        print("valid_len", valid_len)
+        # print("half_valid_len", half_valid_len)
+        # print("valid_len", valid_len)
         # Find max-score keys (note: +1 because the current token's k comes "for free")
         indices = topk_score.topk(
             min(valid_len, score.shape[-1]), -1
