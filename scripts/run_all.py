@@ -92,7 +92,7 @@ for t in TASKS:
                     k: v for k, v in out.items() if k not in {"model_config", "results"}
                 }
                 del out
-                results.append({m: m, t: t, s: s_num, result: result})
+                results.append({"m": m, "t": t, "s": s_num, "result": result})
 
 
 # save results
