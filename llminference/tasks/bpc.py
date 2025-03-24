@@ -60,6 +60,10 @@ def map_dataset2(input: Dict[str, Any]) -> Dict[str, Any]:
     pass
 
 
+def filter_len_larger_than_6400(example):
+    return len(compose_text(example)) > 6400
+
+
 class Alpaca:
     """Filtered version of wikitext-103-v1 (training set) from HuggingFace
     EleutherAI/wikitext_document_level"""
@@ -73,11 +77,9 @@ class Alpaca:
     ) -> datasets.Dataset:
         ds = datasets.load_dataset("yahma/alpaca-cleaned")["train"]
         # print("mapping!!!------------------")
-        ds_mapped = ds.filter(
-            lambda example, idx: len(compose_text(example)) > 6400
-        ).map(map_dataset2, batched=False, remove_columns=ds["train"].column_names)[
-            "train"
-        ]
+        ds_mapped = ds.map(map_dataset2, batched=False, remove_columns=ds.column_names).filter(
+            lambda x : len(x["prefill"]) >= 300
+        )
         # for i in range(100):
         #     print("------")
         #     print(ds_mapped[i]["reference"])
@@ -155,7 +157,7 @@ class PnnTree:
         # Explanation of regex: https://regex101.com/r/yigOBu/1
         # (note: {{{ in the f-string should be read as { in the regex)
         filter_regex = rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len-1}}}.*?)(?:\s|$)"
-        m = re.search(filter_regex, d["page"], flags=re.S)
+        m = re.search(filter_regex, d["sentence"], flags=re.S)
         if m:
             assert len(m.groups()) == 2, (
                 "WikiText filter regex should always have 2 groups,"

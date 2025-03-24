@@ -2,6 +2,7 @@
 import llminference as L
 import llminference.experiments as xp
 import torch
+
 # float 32 vs float 16
 
 # out = xp.run_one(xp.Experiment(
@@ -13,9 +14,15 @@ import torch
 # ))
 # print({k: v for k, v in out.items() if k not in {"model_config", "results"}})
 # del out
-
+TASKS = [
+    "triviaqa",
+    "squad",
+    "cnn_dailymail",
+    "wikitext_bpc",
+    "repetition",
+    "needle",
+]
 models = ["EleutherAI/pythia-410m"]
-datasets = ["alpaca_bpc", "wikitext_bpc"]
 sparsity_num = [0.9, 0.8, 0.6, 0.4]
 sparsity = [
     xp.Sparsity("dense"),
@@ -28,42 +35,47 @@ sparsity = [
         reallocate_to_mean_value=True,
         sparsity=0.8,
     ),
-    xp.Sparsity(
-        "alisa",
-        k=64,
-        local_k=16,
-        score="sparse_q",
-        reallocate_to_mean_value=True,
-        valid_bits=1,
-        last_score=2,
-        sparsity=0.8,
-    ),
-    xp.Sparsity(
-        "exp",
-        k=64,
-        local_k=16,
-        score="sparse_q",
-        reallocate_to_mean_value=True,
-        valid_bits=1,
-        sparsity=0.8,
-    ),
 ]
+for last_score in [2, 4, 8]:
+    sparsity.append(
+        xp.Sparsity(
+            "alisa",
+            k=64,
+            local_k=16,
+            score="sparse_q",
+            reallocate_to_mean_value=False,
+            valid_bits=1,
+            last_score=last_score,
+            sparsity=0.8,
+        )
+    )
+for valid_bits in [1, 2, 3, 4, 5]:
+    sparsity.append(
+        xp.Sparsity(
+            "exp",
+            k=64,
+            local_k=16,
+            score="sparse_q",
+            reallocate_to_mean_value=False,
+            valid_bits=valid_bits,
+            sparsity=0.8,
+        )
+    )
 # %%
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dtype = "float16" if device == "cuda" else "float32"
 print(device)
 results = []
-for m in models:
-    for d in datasets:
+for t in TASKS:
+    for m in models:
         for s_num in sparsity_num:
             for s in sparsity:
-             
-                if hasattr(s, 'sparsity'):
+                if hasattr(s, "sparsity"):
                     s.sparsity = s_num
                 out = xp.run_one(
                     xp.Experiment(
                         "test",
-                        task=xp.Task(d, shots=0, samples=1, confusion_contexts=0),
+                        task=xp.Task(t, shots=0, samples=100, confusion_contexts=0),
                         model=m,
                         execution=xp.Execution(
                             device=device,
@@ -76,11 +88,16 @@ for m in models:
                     )
                 )
 
-                print(
-                    {
-                        k: v
-                        for k, v in out.items()
-                        if k not in {"model_config", "results"}
-                    }
-                )
+                result = {
+                    k: v for k, v in out.items() if k not in {"model_config", "results"}
+                }
                 del out
+                results.append({m: m, t: t, s: s_num, result: result})
+
+
+# save results
+import json
+
+with open("results.json", "w") as f:
+    json.dump(results, f)
+# %%

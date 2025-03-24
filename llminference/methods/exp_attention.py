@@ -320,12 +320,12 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         assert attention_mask is not None
         assert head_mask is None
         # print(
-            "GPTNeoXAttentionWithANN._attn",
-            query.shape,
-            key.shape,
-            value.shape,
-            attention_mask.shape,
-        )
+            # "GPTNeoXAttentionWithANN._attn",
+        #     query.shape,
+        #     key.shape,
+        #     value.shape,
+        #     attention_mask.shape,
+        # )
         # Only enable ANN during autoregressive generation
         if query.shape[-2] == 1:
             output, weight = self.expatt(  # type:ignore[no-any-return]
