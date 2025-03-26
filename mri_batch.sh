@@ -7,7 +7,7 @@
 #SBATCH --time=12:00:00             # Maximum execution time
 #SBATCH --partition=mrigpu          # Use GPU partition
 #SBATCH --gres=gpu:1                # Request 1 GPU
-#SBATCH --output=out.log
+#SBATCH --output=out_batched.log
 
 
 # Load necessary modules
@@ -21,4 +21,4 @@ cd /mnt/mridata/jshen2/git/sparq
 source .venv/bin/activate
 # pip3 install torch torchvision torchaudio
 pip install -e .
-python scripts/run_all.py
+python scripts/run_all_batched.py

@@ -20,7 +20,6 @@ TASKS = [
     "cnn_dailymail",
     "wikitext_bpc",
     "repetition",
-    "needle",
 ]
 models = ["EleutherAI/pythia-410m"]
 sparsity_num = [0.9, 0.8, 0.6, 0.4]
@@ -49,7 +48,7 @@ for last_score in [2, 4]:
             sparsity=0.8,
         )
     )
-for valid_bits in [ 2,  4 ]:
+for valid_bits in [ 2,3,  4 ]:
     sparsity.append(
         xp.Sparsity(
             "exp",
@@ -80,7 +79,7 @@ for t in TASKS:
                         execution=xp.Execution(
                             device=device,
                             dtype=dtype,
-                            batch_size=1,
+                            batch_size=20,
                             pipeline_stages=1,
                             wandb=False,
                         ),
@@ -93,11 +92,16 @@ for t in TASKS:
                 }
                 del out
                 results.append({"m": m, "t": t, "s": s_num, "result": result})
+                import json
+                with open("results_batched.json","w") as f:
+                    json.dump(results,f)
+
+                    
 
 
 # save results
 import json
 
-with open("results.json", "w") as f:
+with open("results_batched.json", "w") as f:
     json.dump(results, f)
 # %%
