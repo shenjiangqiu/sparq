@@ -199,7 +199,7 @@ class LmSysChat:
                 trust_remote_code=True,
             )[
                 "train"
-            ].select(range(2000)),
+            ].select(range(4000)),
             partial(
                 cls.preprocess, prefill_len=prefill_len, reference_len=reference_len
             ),

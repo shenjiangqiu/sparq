@@ -10,6 +10,7 @@ def run_all_exp(samples: int = 100, batch_size: int = 20):
         "squad",
         "cnn_dailymail",
         "wikitext_bpc",
+        "lmsys_bpc",
         "repetition",
     ]
     models = ["EleutherAI/pythia-410m"]
