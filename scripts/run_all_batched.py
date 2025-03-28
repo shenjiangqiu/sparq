@@ -6,13 +6,13 @@ import torch
 
 def run_all_exp(samples: int = 100, batch_size: int = 20):
     TASKS = [
-        # "triviaqa",
-        # "squad",
-        # "cnn_dailymail",
+        "triviaqa",
+        "squad",
+        "cnn_dailymail",
         "lmsys_bpc",
         "c4_bpc",
         "wikitext_bpc",
-        # "repetition",
+        "repetition",
     ]
     models = ["EleutherAI/pythia-410m"]
     sparsity_num = [0.4, 0.6, 0.8, 0.9]
@@ -28,19 +28,18 @@ def run_all_exp(samples: int = 100, batch_size: int = 20):
             sparsity=0.8,
         ),
     ]
-    for last_score in [2, 4]:
-        sparsity.append(
-            xp.Sparsity(
-                "alisa",
-                k=64,
-                local_k=16,
-                score="sparse_q",
-                reallocate_to_mean_value=False,
-                valid_bits=1,
-                last_score=last_score,
-                sparsity=0.8,
-            )
+    sparsity.append(
+        xp.Sparsity(
+            "alisa",
+            k=64,
+            local_k=16,
+            score="sparse_q",
+            reallocate_to_mean_value=False,
+            valid_bits=1,
+            last_score=2,
+            sparsity=0.8,
         )
+    )
     for valid_bits in [2, 3, 4]:
         sparsity.append(
             xp.Sparsity(
