@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import Any, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -25,7 +25,6 @@ from transformers.models.mistral.modeling_mistral import (
 import torch.nn.functional as F
 from .. import utility
 from ..models import gemma_attention, llama_attention, mistral_attention
-from . import sparse_attention
 
 
 def gather(t: Tensor, dim: int, i: Tensor) -> Tensor:
@@ -144,9 +143,9 @@ class Settings:
             ctor: Any = ExpScore.Settings
             score_settings: ScoreSettings = ctor(**args)
         else:
-            assert (
-                not args
-            ), "ann_attention.Setting only accepts **args when `score` is a string"
+            assert not args, (
+                "ann_attention.Setting only accepts **args when `score` is a string"
+            )
             score_settings = score
         self.k = k
         self.local_k = local_k
@@ -230,7 +229,7 @@ class AlisaAttention(nn.Module):
         valid_len = int(valid_part * key.shape[-2])
         if valid_len % 2 == 1:
             valid_len += 1
-        
+
         batch, n_kv_heads, seq, head_size = key.shape
         n_heads_per_kv = query.shape[1] // n_kv_heads
 
@@ -259,9 +258,11 @@ class AlisaAttention(nn.Module):
         half_valid_len = int(valid_len / 2)
         valid_len_int = int(valid_len)
         # print("valid len: ", valid_len_int)
-        last_weight_sum = last_weight.sum(-2, keepdim=True)
+        last_weight_sum = last_weight[:, :, -half_valid_len:, : key.shape[-2]].sum(
+            -2, keepdim=True
+        )
         last_weight_sum[:, :, :, -half_valid_len:] += 1
-        indices = last_weight_sum.topk(valid_len_int, dim=-1).indices 
+        indices = last_weight_sum.topk(valid_len_int, dim=-1).indices
         # print("indices_shape: ", indices.shape)
         # print("indices: ", indices[0, 0])
         # if self.debug_indices is not None:
@@ -346,8 +347,12 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
 
             # Pad `self.weights` with zeros if needed
             if current_size < target_size:
-                pad_size = target_size - current_size
+                pad_size = current_size * 2
                 self.weights = F.pad(self.weights, (0, pad_size))
+            new_size = self.weights.shape[-1]
+            # pad target weight
+            if target_size < new_size:
+                weight = F.pad(weight, (0, new_size - target_size))
             self.weights = torch.cat(
                 [self.weights[:, :, 1:, :], weight.clone()], dim=-2
             )
@@ -360,7 +365,7 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
                 query, key, value, attention_mask, head_mask
             )
             # print("weight_shape: ", weight.shape)
-            self.weights = weight[:, :, -self.last_score :, :].clone()
+            self.weights = weight.clone()
             # print("self.weights_shape: ", self.weights.shape)
             return output, weight
 
