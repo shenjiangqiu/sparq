@@ -76,7 +76,6 @@ class ExpScore(nn.Module):
     class Settings:
         valid_bits: int
         last_score: int
-        sparsity: float
 
     def __init__(self, settings: Settings):
         super().__init__()
@@ -130,6 +129,7 @@ class Settings:
     local_k: int
     reallocate_to_mean_value: bool
     score: ScoreSettings
+    sparsity: float
 
     def __init__(
         self,
@@ -137,6 +137,7 @@ class Settings:
         local_k: int,
         reallocate_to_mean_value: bool,
         score: Union[ScoreSettings, str],
+        sparsity: float,
         **args: Any,
     ):
         if isinstance(score, str):
@@ -150,6 +151,7 @@ class Settings:
         self.k = k
         self.local_k = local_k
         self.reallocate_to_mean_value = reallocate_to_mean_value
+        self.sparsity = sparsity
         self.score = score_settings
 
 
@@ -224,7 +226,7 @@ class AlisaAttention(nn.Module):
                    weights -- (batch, n_heads, 1, seq)
         """
 
-        sparsity = self.settings.score.sparsity
+        sparsity = self.settings.sparsity
         valid_part = 1 - sparsity
         valid_len = int(valid_part * key.shape[-2])
         if valid_len % 2 == 1:
@@ -315,6 +317,7 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         # print("Using AlisaAttention init!")
         self.weights = None
         self.last_score = settings.score.last_score
+        self.settings = settings
 
     def _attn(
         self,
@@ -347,15 +350,13 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
 
             # Pad `self.weights` with zeros if needed
             if current_size < target_size:
-                pad_size = current_size * 2
+                pad_size = 100
                 self.weights = F.pad(self.weights, (0, pad_size))
             new_size = self.weights.shape[-1]
             # pad target weight
             if target_size < new_size:
                 weight = F.pad(weight, (0, new_size - target_size))
-            self.weights = torch.cat(
-                [self.weights[:, :, 1:, :], weight.clone()], dim=-2
-            )
+            self.weights = torch.cat([self.weights[:, :, :, :], weight.clone()], dim=-2)
             # print("self.weights_shape: ", self.weights.shape)
             weight_sum = self.weights.sum(dim=-1)
             # print("weightsum:", weight_sum[0, 0])
@@ -365,7 +366,9 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
                 query, key, value, attention_mask, head_mask
             )
             # print("weight_shape: ", weight.shape)
-            self.weights = weight.clone()
+            att_len = weight.shape[-2]
+            valid_len = int((1 - self.settings.sparsity) * att_len / 2) + 4
+            self.weights = weight[:, :, -valid_len:, :].clone()
             # print("self.weights_shape: ", self.weights.shape)
             return output, weight
 
