@@ -20,5 +20,5 @@ cd /mnt/mridata/jshen2/git/sparq
 # Run Python script
 source .venv/bin/activate
 # pip3 install torch torchvision torchaudio
-pip install -e .
+# pip install -e .
 python scripts/run_all_batched.py 500 20

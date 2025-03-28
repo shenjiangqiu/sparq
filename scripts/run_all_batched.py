@@ -6,12 +6,12 @@ import torch
 
 def run_all_exp(samples: int = 100, batch_size: int = 20):
     TASKS = [
-        "triviaqa",
-        "squad",
-        "cnn_dailymail",
-        "wikitext_bpc",
+        # "triviaqa",
+        # "squad",
+        # "cnn_dailymail",
+        # "wikitext_bpc",
         "lmsys_bpc",
-        "repetition",
+        # "repetition",
     ]
     models = ["EleutherAI/pythia-410m"]
     sparsity_num = [0.9, 0.8, 0.6, 0.4]
