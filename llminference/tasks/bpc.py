@@ -202,7 +202,7 @@ class LmSysChat:
             datasets.load_dataset(
                 "lmsys/lmsys-chat-1m",
                 trust_remote_code=True,
-            )["train"].select(range(4000)),
+            )["train"].select(range(20000)),
             partial(
                 cls.preprocess, prefill_len=prefill_len, reference_len=reference_len
             ),
