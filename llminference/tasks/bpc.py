@@ -257,7 +257,7 @@ class C4:
             streaming=True,
             trust_remote_code=True,
         )
-        ds_2000 = list(iter(ds.take(2000)))
+        ds_2000 = list(iter(ds.take(10000)))
         c4_subset = datasets.Dataset.from_list(ds_2000)
         return utility.map_and_filter(
             c4_subset,
