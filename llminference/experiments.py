@@ -57,6 +57,7 @@ TASKS = (
     "cnn_dailymail",
     "wikitext_bpc",
     "lmsys_bpc",
+    "c4_bpc",
     "alpaca_bpc",
     "repetition",
     "needle",
@@ -219,6 +220,11 @@ def _evaluate(
     elif task.name == "lmsys_bpc":
         assert task.shots == 0 and task.confusion_contexts == 0
         data = bpc.LmSysChat.data()
+        examples = [data[i] for i in range(task.samples)]
+        evaluate_fn = bpc.evaluate
+    elif task.name == "c4_bpc":
+        assert task.shots == 0 and task.confusion_contexts == 0
+        data = bpc.C4.data()
         examples = [data[i] for i in range(task.samples)]
         evaluate_fn = bpc.evaluate
     elif task.name == "alpaca_bpc":

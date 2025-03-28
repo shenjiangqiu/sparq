@@ -49,12 +49,14 @@ def compose_sparsity(sparsity) -> str:
 
 for r in final_results:
     print(r)
+
     task_result = {}
     for sparsity, test in final_results[r]:
         # print(test)
-        sparsity = compose_sparsity(test["sparsity"])
-        if sparsity not in task_result:
-            task_result[sparsity] = []
+        print(sparsity)
+        sparsity_method = compose_sparsity(test["sparsity"])
+        if sparsity_method not in task_result:
+            task_result[sparsity_method] = []
         if r[1] == "triviaqa":
             score = test["match"]
         elif r[1] == "squad":
@@ -67,10 +69,11 @@ for r in final_results:
             score = test["match_length_char"]
         elif r[1] == "lmsys_bpc":
             print(test)
-            score = test["bpc"]
+            # score = test["bpc"]
+            score = 0
         else:
-            raise ValueError(f"Unknown task {r[1]}")
-        task_result[sparsity].append(score)
+            score = 0
+        task_result[sparsity_method].append(score)
     for key in task_result:
         score_result_list = task_result[key]
         # space separated

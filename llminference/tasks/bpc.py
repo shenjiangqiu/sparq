@@ -18,6 +18,7 @@ For example:
     print(results[0]["bpc"])  # => 1.234
     print(results[9]["bpc"])  # => 5.678
 """
+
 import math
 import re
 from functools import partial
@@ -107,7 +108,9 @@ class WikiText:
         """
         # Explanation of regex: https://regex101.com/r/yigOBu/1
         # (note: {{{ in the f-string should be read as { in the regex)
-        filter_regex = rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len-1}}}.*?)(?:\s|$)"
+        filter_regex = (
+            rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len - 1}}}.*?)(?:\s|$)"
+        )
         m = re.search(filter_regex, d["page"], flags=re.S)
         if m:
             assert len(m.groups()) == 2, (
@@ -177,7 +180,9 @@ class LmSysChat:
         data = compose_task(d)
         # Explanation of regex: https://regex101.com/r/yigOBu/1
         # (note: {{{ in the f-string should be read as { in the regex)
-        filter_regex = rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len-1}}}.*?)(?:\s|$)"
+        filter_regex = (
+            rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len - 1}}}.*?)(?:\s|$)"
+        )
         m = re.search(filter_regex, data, flags=re.S)
         if m:
             assert len(m.groups()) == 2, (
@@ -197,9 +202,65 @@ class LmSysChat:
             datasets.load_dataset(
                 "lmsys/lmsys-chat-1m",
                 trust_remote_code=True,
-            )[
-                "train"
-            ].select(range(4000)),
+            )["train"].select(range(4000)),
+            partial(
+                cls.preprocess, prefill_len=prefill_len, reference_len=reference_len
+            ),
+        ).shuffle(shuffle_seed)
+
+
+class C4:
+    """Filtered version of wikitext-103-v1 (training set) from HuggingFace
+    EleutherAI/wikitext_document_level"""
+
+    @staticmethod
+    def preprocess(
+        d: Dict[str, Any], prefill_len: int, reference_len: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate a summarisation example from wikitext-103-v1.
+
+        Examples will be split into "prefill" and "reference" sub-strings, where the
+        prefill ends just before the first whitespace character occurring after
+        `prefill_len` characters, and the reference string ends just before the first
+        whitespace character or end-of-line occurring after `reference_len` characters.
+        Should the dataset string not match this format, it will be filtered out
+        (i.e. nothing returned here).
+
+        Yields: {"prefill": str, "reference": str}
+        """
+
+        data = d["text"]
+        # Explanation of regex: https://regex101.com/r/yigOBu/1
+        # (note: {{{ in the f-string should be read as { in the regex)
+        filter_regex = (
+            rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len - 1}}}.*?)(?:\s|$)"
+        )
+        m = re.search(filter_regex, data, flags=re.S)
+        if m:
+            assert len(m.groups()) == 2, (
+                "WikiText filter regex should always have 2 groups,"
+                f"but has {len(m.groups())} on string '{data}'"
+            )
+            return dict(prefill=m.group(1), reference=m.group(2))
+
+    @classmethod
+    def data(
+        cls,
+        shuffle_seed: int = 2353669,
+        prefill_len: int = 6000,
+        reference_len: int = 400,
+    ) -> datasets.Dataset:
+        ds = datasets.load_dataset(
+            "allenai/c4",
+            "en",
+            split="train",
+            streaming=True,
+            trust_remote_code=True,
+        )
+        ds_2000 = list(iter(ds.take(2000)))
+        c4_subset = datasets.Dataset.from_list(ds_2000)
+        return utility.map_and_filter(
+            c4_subset,
             partial(
                 cls.preprocess, prefill_len=prefill_len, reference_len=reference_len
             ),
@@ -227,7 +288,9 @@ class PnnTree:
         """
         # Explanation of regex: https://regex101.com/r/yigOBu/1
         # (note: {{{ in the f-string should be read as { in the regex)
-        filter_regex = rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len-1}}}.*?)(?:\s|$)"
+        filter_regex = (
+            rf"^(.{{{prefill_len}}}.*?)(\s.{{{reference_len - 1}}}.*?)(?:\s|$)"
+        )
         m = re.search(filter_regex, d["sentence"], flags=re.S)
         if m:
             assert len(m.groups()) == 2, (
@@ -320,7 +383,7 @@ def evaluate(
             generation_context=generation_context,
             max_reference_tokens=max_reference_tokens,
         )
-        bpcs = calc_bpc(nll_batch, reference_char_lengths)
+        bpcs = calculate_perlexity(nll_batch, reference_char_lengths)
         for p, pr_len, g_len in zip(bpcs, prefill_lengths, reference_lengths):
             yield dict(
                 bpc=p.item(),

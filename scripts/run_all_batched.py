@@ -9,12 +9,13 @@ def run_all_exp(samples: int = 100, batch_size: int = 20):
         # "triviaqa",
         # "squad",
         # "cnn_dailymail",
-        # "wikitext_bpc",
         "lmsys_bpc",
+        "c4_bpc",
+        "wikitext_bpc",
         # "repetition",
     ]
     models = ["EleutherAI/pythia-410m"]
-    sparsity_num = [0.9, 0.8, 0.6, 0.4]
+    sparsity_num = [0.4, 0.6, 0.8, 0.9]
     sparsity = [
         xp.Sparsity("dense"),
         xp.Sparsity(

@@ -7,7 +7,7 @@ import llminference.experiments as xp
 out = xp.run_one(
     xp.Experiment(
         "test",
-        task=xp.Task("lmsys_bpc", shots=0, samples=10, confusion_contexts=0),
+        task=xp.Task("c4_bpc", shots=0, samples=10, confusion_contexts=0),
         model="EleutherAI/pythia-410m",
         execution=xp.Execution(
             device="cpu",
