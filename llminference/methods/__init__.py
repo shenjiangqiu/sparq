@@ -6,4 +6,5 @@ from . import (  # noqa: F401
     eviction_attention,
     quantisation,
     sparse_attention,
+    dynamic_attention,
 )
