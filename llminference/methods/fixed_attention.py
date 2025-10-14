@@ -25,6 +25,7 @@ from transformers.models.mistral.modeling_mistral import (
 
 from .. import utility
 from ..models import gemma_attention, llama_attention, mistral_attention
+from . import sparse_attention
 
 
 def gather(t: Tensor, dim: int, i: Tensor) -> Tensor:
@@ -91,10 +92,10 @@ class SparseQ(nn.Module):
 
         # Sum the magnitudes within KV groups before top-k
         # shape -- (batch, n_kv_heads, 1, 1, rank)
-        topk = query.abs().sum(dim=2, keepdim=True).topk(dim=-1, k=self.settings.rank)
+        # topk = query.abs().sum(dim=2, keepdim=True).topk(dim=-1, k=self.settings.rank)
 
-        query_proj = gather(query, -1, topk.indices)
-        key_proj = gather(key, -1, topk.indices)
+        query_proj = query
+        key_proj = key
 
         # Scale could be:
         #  - sqrt(head_size) -- if we think our approximation is exact
@@ -123,7 +124,6 @@ class Settings:
     reallocate_to_mean_value: bool
     sparsity: float
     score: ScoreSettings
-    global_stats: Optional[dict] = None
 
     def __init__(
         self,
@@ -132,7 +132,6 @@ class Settings:
         reallocate_to_mean_value: bool,
         sparsity: float,
         score: Union[ScoreSettings, str],
-        global_stats: Optional[dict],
         **args: Any,
     ):
         if isinstance(score, str):
@@ -150,7 +149,6 @@ class Settings:
         self.sparsity = sparsity
         self.reallocate_to_mean_value = reallocate_to_mean_value
         self.score = score_settings
-        self.global_stats = global_stats
 
 
 class AnnAttention(nn.Module):
@@ -175,82 +173,36 @@ class AnnAttention(nn.Module):
         key: Tensor,
         value: Tensor,
         logmask: Tensor,
-        threshold: float = 0.9,  # 累积权重阈值
-        global_stats: Optional[dict] = None,
+        kv_weight: Tensor,
+        mean_value: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        """Dense attention, with left-over weight reallocation and threshold pruning.
+        """Dense attention, with left-over weight reallocation.
 
         query -- (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
+
         key -- (batch, n_kv_heads, 1, n_kv, head_size)
-        value -- (batch, n_kv_heads, 1, n_kv, head_size)
+
+        value -- (batch, n_kv_heads, 1, n_heads, n_kv, head_size)
+
         logmask -- (batch, n_kv_heads, n_heads_per_kv, n_query, n_kv)
-        threshold -- float, cumulative weight threshold for token selection
+
+        kv_weight -- (batch, n_kv_heads, n_heads_per_kv, n_query) | ()
+                  -- 1.0 for regular attention (no reallocation)
+
+        mean_value -- (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
         """
         scores = (query.div(query.shape[-1] ** 0.5) @ key.transpose(-1, -2)).add_(
             logmask
         )
         weights = torch.softmax(scores, -1, dtype=torch.float32).to(value.dtype)
-
-        # 对 weights 做排序，选出累加值大于 threshold 的前 n 个 token
-        orig_shape = weights.shape
-        batch, n_kv_heads, n_heads_per_kv, n_query, n_kv = weights.shape
-        assert n_query == 1, "Only support n_query == 1 for simplicity"
-        flat_weights = weights.reshape(-1, n_kv)  # [B*H*Hk*Q, K]
-        mask = torch.zeros_like(flat_weights, dtype=torch.bool)
-        selected_weight_sum = torch.zeros(
-            flat_weights.size(0), device=weights.device, dtype=weights.dtype
-        )
-        selected_indices = []
-
-        for i in range(flat_weights.size(0)):
-            w = flat_weights[i]
-            sorted_w, idx = torch.sort(w, descending=True)
-            cumsum = torch.cumsum(sorted_w, dim=0)
-            n = (cumsum >= threshold).nonzero(as_tuple=True)[0]
-            n = n[0].item() + 1 if len(n) > 0 else len(sorted_w)
-            if global_stats is not None:
-                global_stats["n_selected"] += n
-                global_stats["total_tokens"] += len(sorted_w)
-
-            mask[i, idx[:n]] = True
-            selected_weight_sum[i] = sorted_w[:n].sum()
-            selected_indices.append(idx[:n])
-
-        # 还原mask形状
-        mask = mask.view(orig_shape)
-        pruned_weights = weights * mask
-        pruned_weights_sum = pruned_weights.sum(dim=-1, keepdim=True) + 1e-8
-        pruned_weights = pruned_weights / pruned_weights_sum
-
-        # 计算 mean_value: (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
-        # value: (batch, n_kv_heads, 1, n_kv, head_size)
-        # logmask: (batch, n_kv_heads, n_heads_per_kv, n_query, n_kv)
-        # 取 logmask 的 exp 得到 mask
-        value_mask = (
-            logmask[:, :, :1].squeeze(-2).unsqueeze(-1).exp()
-        )  # (batch, n_kv_heads, 1, seq, 1)
-        mean_value = (
-            (value * value_mask)
-            .sum(-2, dtype=torch.float32, keepdim=True)
-            .div_(value_mask.sum(-2, dtype=torch.float32, keepdim=True))
-            .to(value.dtype)
-        )  # (batch, n_kv_heads, 1, 1, 1)
-
-        # kv_weight: (batch, n_kv_heads, n_heads_per_kv, n_query)
-        kv_weight = selected_weight_sum.view(batch, n_kv_heads, n_heads_per_kv, n_query)
-
         # Value-mixing with reallocation
-        pruned_weights = pruned_weights * kv_weight[..., None]
-        output = pruned_weights @ value
+        weights *= kv_weight[..., None]
+        output = weights @ value
         output += (1 - kv_weight[..., None]) * mean_value
-        return output, pruned_weights
+        return output, weights
 
     def forward(
-        self,
-        query: Tensor,
-        key: Tensor,
-        value: Tensor,
-        logmask: Tensor,
+        self, query: Tensor, key: Tensor, value: Tensor, logmask: Tensor
     ) -> Tuple[Tensor, Tensor]:
         """Preprocess (key, value, mask) for ANN attention.
 
@@ -268,14 +220,12 @@ class AnnAttention(nn.Module):
         """
         batch, n_kv_heads, seq, head_size = key.shape
         n_heads_per_kv = query.shape[1] // n_kv_heads
-        # print("logmask shape:", logmask.shape)
+
         # Group by KV head
         query, key, value, logmask = map(
             partial(torch.unflatten, dim=1, sizes=(n_kv_heads, -1)),
             [query, key, value, logmask],
         )
-        # print("logmask shape:", logmask.shape)
-        # print("logmask:", logmask)
 
         assert query.shape == (batch, n_kv_heads, n_heads_per_kv, 1, head_size)
         assert key.shape == (batch, n_kv_heads, 1, seq, head_size)
@@ -284,79 +234,62 @@ class AnnAttention(nn.Module):
 
         # Calculate an approximate score for each (query, key) pair
         # shape -- (batch, n_kv_heads, n_heads_per_kv, 1, seq)
-        # score = (self.score(query, key) + logmask).float()
+        score = (self.score(query, key) + logmask).float()
+        seq_len = key.shape[-2]
 
-        # def get_weights(query, key, value, logmask):
-        #     scores = (query.div(query.shape[-1] ** 0.5) @ key.transpose(-1, -2)).add_(
-        #         logmask
-        #     )
-        #     weights = torch.softmax(scores, -1, dtype=torch.float32).to(value.dtype)
-        #     return weights
-
-        # weights = get_weights(query, key, value, logmask)
-        # assert weights.shape == (batch, n_kv_heads, n_heads_per_kv, 1, seq)
-        # print("Weights shape:", weights.shape)
-        # seq_len = key.shape[-2]
-
-        # sparsity = self.settings.sparsity
-        # valid_len = int((1 - sparsity) * seq_len)
-        # if valid_len % 2 == 1:
-        #     valid_len += 1
-        # half_valid_len = int(valid_len / 2)
+        sparsity = self.settings.sparsity
+        valid_len = int((1 - sparsity) * seq_len)
+        if valid_len % 2 == 1:
+            valid_len += 1
+        half_valid_len = int(valid_len / 2)
         # Set the score of local keys (+1 current) to max
-        # causal_index = sparse_attention.causal_index(logmask)
-        # print("causal_index:", causal_index)
-        # is_local = (0 <= causal_index) & (causal_index < half_valid_len + 1)
-        # print(is_local)
-        # print("score shape:", score.shape)
-        # topk_score = score.masked_fill(is_local, torch.finfo(score.dtype).max).sum(
-        #     dim=2, keepdim=True
-        # )
-        # print("Topk_score shape:", topk_score.shape)
-        # # print("half_valid_len", half_valid_len)
-        # # print("valid_len", valid_len)
-        # # Find max-score keys (note: +1 because the current token's k comes "for free")
-        # indices = topk_score.topk(
-        #     min(valid_len, score.shape[-1]), -1
-        # ).indices  # (batch, n_kv_heads, 1, 1, k+1)
-        # print("Indices shape:", indices.shape)
-        # print("Indices:", indices)
-        # if self.debug_indices is not None:
-        #     self.debug_indices.append(indices)
-        # Score shape: torch.Size([1, 16, 1, 1, 1327])
-        # Indices shape: torch.Size([1, 16, 1, 1, 266])
+        causal_index = sparse_attention.causal_index(logmask)
+        is_local = (0 <= causal_index) & (causal_index < half_valid_len + 1)
+        topk_score = score.masked_fill(is_local, torch.finfo(score.dtype).max).sum(
+            dim=2, keepdim=True
+        )
+        # print("half_valid_len", half_valid_len)
+        # print("valid_len", valid_len)
+        # Find max-score keys (note: +1 because the current token's k comes "for free")
+        indices = topk_score.topk(
+            min(valid_len, score.shape[-1]), -1
+        ).indices  # (batch, n_kv_heads, 1, 1, k+1)
+        if self.debug_indices is not None:
+            self.debug_indices.append(indices)
+
         # Optional "mean_value" kv
         # Note: assumes same logmask for all heads
-        # value_mask = (
-        #     logmask[:, :, :1].squeeze(-2).unsqueeze(-1).exp()
-        # )  # (batch, n_kv_heads, 1, seq, 1)
-        # mean_value = (
-        #     (value * value_mask)
-        #     .sum(-2, dtype=torch.float32, keepdim=True)
-        #     .div_(value_mask.sum(-2, dtype=torch.float32, keepdim=True))
-        #     .to(value.dtype)
-        # )  # (batch, n_kv_heads, 1, 1, 1)
-        # kv_weight = torch.tensor(1.0, device=query.device)
-        # if self.settings.reallocate_to_mean_value:
-        #     kv_weight = (
-        #         gather(torch.softmax(score, -1), -1, indices)  # no need to expand here
-        #         .sum(-1)
-        #         .to(value.dtype)
-        #     )  # (batch, n_kv_heads, n_heads_per_kv, 1)
+        value_mask = (
+            logmask[:, :, :1].squeeze(-2).unsqueeze(-1).exp()
+        )  # (batch, n_kv_heads, 1, seq, 1)
+        mean_value = (
+            (value * value_mask)
+            .sum(-2, dtype=torch.float32, keepdim=True)
+            .div_(value_mask.sum(-2, dtype=torch.float32, keepdim=True))
+            .to(value.dtype)
+        )  # (batch, n_kv_heads, 1, 1, 1)
+        kv_weight = torch.tensor(1.0, device=query.device)
+        if self.settings.reallocate_to_mean_value:
+            kv_weight = (
+                gather(torch.softmax(score, -1), -1, indices)  # no need to expand here
+                .sum(-1)
+                .to(value.dtype)
+            )  # (batch, n_kv_heads, n_heads_per_kv, 1)
 
         # Slice key, value, logmask for attention
-        # kv_indices = indices.squeeze(-2).unsqueeze(-1)  # (batch, n_kv_heads, 1, k+1, 1)
+        kv_indices = indices.squeeze(-2).unsqueeze(-1)  # (batch, n_kv_heads, 1, k+1, 1)
         output, weights = self._attention(
             query,
-            key,
-            value,
-            logmask,
-            threshold=self.settings.sparsity,
-            global_stats=self.settings.global_stats,
+            gather(key, -2, kv_indices),
+            gather(value, -2, kv_indices),
+            gather(logmask, -1, indices),
+            kv_weight=kv_weight,
+            mean_value=mean_value,
         )
-
         # Note: expand indices as scatter does not broadcast (!)
-        return output.flatten(1, 2), weights.flatten(1, 2)
+        return output.flatten(1, 2), torch.zeros_like(logmask).scatter(
+            -1, indices.expand_as(weights), weights
+        ).flatten(1, 2)
 
 
 Model = Union[
@@ -381,10 +314,6 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         assert attention_mask is not None
         assert head_mask is None
 
-        # query shape -- (batch, n_heads, token_length, head_size)
-        # key shape -- (batch, n_heads, kv_length, head_size)
-        # value shape -- (batch, n_heads, kv_length, head_size)
-        # attention_mask shape -- (batch, n_heads, token_length, kv_length)
         # Only enable ANN during autoregressive generation
         if query.shape[-2] == 1:
             return self.ann(  # type:ignore[no-any-return]
@@ -416,12 +345,6 @@ class LlamaAttentionWithANN(llama_attention.LlamaAttention):
         logmask: Tensor,
     ) -> Tuple[Tensor, Tensor]:
         if query.shape[-2] == 1:
-            print("Using ANN for LlamaAttentionWithANN")
-            print("Query shape:", query.shape)
-            print("Key shape:", key.shape)
-            print("Value shape:", value.shape)
-            print("Logmask shape:", logmask.shape)
-
             return self.ann(  # type:ignore[no-any-return]
                 query,
                 key,
@@ -480,7 +403,6 @@ class MistralAttentionWithANN(mistral_attention.MistralAttention):
 
 def convert(model: Model, settings: Settings) -> Model:
     """Convert a model to use KV cache compression using ANN."""
-    print("Dynamic!!!")
 
     def _replace(m: nn.Module) -> Optional[nn.Module]:
         if isinstance(m, GPTNeoXAttention):

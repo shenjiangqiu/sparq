@@ -4,7 +4,6 @@ import llminference.experiments as xp
 global_results = []
 # %%
 for sparsity in [i / 100 for i in range(98, 70, -2)]:
-    global_stats = {"n_selected": 0, "total_tokens": 0}
     out = xp.run_one(
         xp.Experiment(
             "test",
@@ -18,24 +17,19 @@ for sparsity in [i / 100 for i in range(98, 70, -2)]:
                 wandb=False,
             ),
             sparsity=xp.Sparsity(
-                "dynamic",
+                "ann",
                 k=64,
                 local_k=16,
                 score="sparse_q",
                 rank=16,
                 reallocate_to_mean_value=True,
                 sparsity=sparsity,
-                global_stats=global_stats,
             ),
         )
     )
 
     print({k: v for k, v in out.items() if k not in {"model_config", "results"}})
-    print(global_stats)
-    print(
-        "real_sparsity:", 1 - global_stats["n_selected"] / global_stats["total_tokens"]
-    )
-    global_results.append((sparsity, out["bpc"], global_stats))
+    global_results.append((sparsity, out["bpc"]))
     del out
 
 # %%

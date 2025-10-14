@@ -192,6 +192,17 @@ class SparsityMethods:
         assert isinstance(model, MODELS)
         return dynamic_attention.convert(model, dynamic_attention.Settings(**settings))
 
+    @staticmethod
+    def fixed(model: PreTrainedModel, **settings: Any) -> PreTrainedModel:
+        """
+        占位：动态稀疏方法入口。请在 llminference/methods/dynamic_attention.py 中实现 convert()。
+        支持通过 kwargs 传入 Settings 所需参数。
+        """
+        from .methods import fixed_attention
+
+        assert isinstance(model, MODELS)
+        return fixed_attention.convert(model, fixed_attention.Settings(**settings))
+
 
 # Running
 def _evaluate(
