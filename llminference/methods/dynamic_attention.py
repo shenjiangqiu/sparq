@@ -201,13 +201,14 @@ class AnnAttention(nn.Module):
             flat_weights.size(0), device=weights.device, dtype=weights.dtype
         )
         selected_indices = []
-
+        header_selected_len = []
         for i in range(flat_weights.size(0)):
             w = flat_weights[i]
             sorted_w, idx = torch.sort(w, descending=True)
             cumsum = torch.cumsum(sorted_w, dim=0)
             n = (cumsum >= threshold).nonzero(as_tuple=True)[0]
             n = n[0].item() + 1 if len(n) > 0 else len(sorted_w)
+            header_selected_len.append(n)
             if global_stats is not None:
                 global_stats["n_selected"] += n
                 global_stats["total_tokens"] += len(sorted_w)
@@ -220,6 +221,9 @@ class AnnAttention(nn.Module):
         mask = mask.view(orig_shape)
         pruned_weights = weights * mask
         pruned_weights_sum = pruned_weights.sum(dim=-1, keepdim=True) + 1e-8
+        # print(pruned_weights_sum)
+        # print(selected_weight_sum)
+        # todo, don't normalize.
         pruned_weights = pruned_weights / pruned_weights_sum
 
         # 计算 mean_value: (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
@@ -240,9 +244,9 @@ class AnnAttention(nn.Module):
         kv_weight = selected_weight_sum.view(batch, n_kv_heads, n_heads_per_kv, n_query)
 
         # Value-mixing with reallocation
-        pruned_weights = pruned_weights * kv_weight[..., None]
+        # pruned_weights = pruned_weights * kv_weight[..., None]
         output = pruned_weights @ value
-        output += (1 - kv_weight[..., None]) * mean_value
+        # output += (1 - kv_weight[..., None]) * mean_value
         return output, pruned_weights
 
     def forward(

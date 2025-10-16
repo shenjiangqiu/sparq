@@ -3,12 +3,12 @@ import llminference.experiments as xp
 
 global_results = []
 # %%
-for sparsity in [i / 100 for i in range(98, 70, -2)]:
+for sparsity in [i / 100 for i in range(98, 90, -2)]:
     global_stats = {"n_selected": 0, "total_tokens": 0}
     out = xp.run_one(
         xp.Experiment(
             "test",
-            task=xp.Task("wikitext_bpc", shots=0, samples=20, confusion_contexts=0),
+            task=xp.Task("wikitext_bpc", shots=0, samples=10, confusion_contexts=0),
             model="EleutherAI/pythia-410m",
             execution=xp.Execution(
                 device="mps",
@@ -37,6 +37,7 @@ for sparsity in [i / 100 for i in range(98, 70, -2)]:
     )
     global_results.append((sparsity, out["bpc"], global_stats))
     del out
+    break
 
 # %%
 print(global_results)

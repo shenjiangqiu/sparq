@@ -254,6 +254,7 @@ class AnnAttention(nn.Module):
         indices = topk_score.topk(
             min(valid_len, score.shape[-1]), -1
         ).indices  # (batch, n_kv_heads, 1, 1, k+1)
+
         if self.debug_indices is not None:
             self.debug_indices.append(indices)
 
