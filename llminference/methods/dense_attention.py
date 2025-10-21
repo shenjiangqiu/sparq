@@ -25,7 +25,6 @@ from transformers.models.mistral.modeling_mistral import (
 
 from .. import utility
 from ..models import gemma_attention, llama_attention, mistral_attention
-from . import sparse_attention
 
 
 def gather(t: Tensor, dim: int, i: Tensor) -> Tensor:
@@ -92,10 +91,10 @@ class SparseQ(nn.Module):
 
         # Sum the magnitudes within KV groups before top-k
         # shape -- (batch, n_kv_heads, 1, 1, rank)
-        # topk = query.abs().sum(dim=2, keepdim=True).topk(dim=-1, k=self.settings.rank)
+        topk = query.abs().sum(dim=2, keepdim=True).topk(dim=-1, k=self.settings.rank)
 
-        query_proj = query
-        key_proj = key
+        query_proj = gather(query, -1, topk.indices)
+        key_proj = gather(key, -1, topk.indices)
 
         # Scale could be:
         #  - sqrt(head_size) -- if we think our approximation is exact
@@ -124,6 +123,7 @@ class Settings:
     reallocate_to_mean_value: bool
     sparsity: float
     score: ScoreSettings
+    global_stats: Optional[dict] = None
 
     def __init__(
         self,
@@ -132,6 +132,7 @@ class Settings:
         reallocate_to_mean_value: bool,
         sparsity: float,
         score: Union[ScoreSettings, str],
+        global_stats: Optional[dict],
         **args: Any,
     ):
         if isinstance(score, str):
@@ -140,157 +141,16 @@ class Settings:
             ]
             score_settings: ScoreSettings = ctor(**args)
         else:
-            assert not args, (
-                "ann_attention.Setting only accepts **args when `score` is a string"
-            )
+            assert (
+                not args
+            ), "ann_attention.Setting only accepts **args when `score` is a string"
             score_settings = score
         self.k = k
         self.local_k = local_k
         self.sparsity = sparsity
         self.reallocate_to_mean_value = reallocate_to_mean_value
         self.score = score_settings
-
-
-class AnnAttention(nn.Module):
-    """Generic ANN with local windowing and masking."""
-
-    def __init__(self, settings: Settings, n_kv_heads: int, head_size: int):
-        super().__init__()
-        self.settings = settings
-        self.score: nn.Module
-        if isinstance(settings.score, LowRank.Settings):
-            self.score = LowRank(settings.score, n_kv_heads, head_size)
-        elif isinstance(settings.score, SparseQ.Settings):
-            self.score = SparseQ(settings.score)
-        else:
-            raise ValueError(f"Unexpected settings.score = {settings.score}")
-        # Set to an empty list to turn on ANN index logging
-        self.debug_indices: Optional[List[Tensor]] = None
-
-    def _attention(
-        self,
-        query: Tensor,
-        key: Tensor,
-        value: Tensor,
-        logmask: Tensor,
-        kv_weight: Tensor,
-        mean_value: Tensor,
-    ) -> Tuple[Tensor, Tensor]:
-        """Dense attention, with left-over weight reallocation.
-
-        query -- (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
-
-        key -- (batch, n_kv_heads, 1, n_kv, head_size)
-
-        value -- (batch, n_kv_heads, 1, n_heads, n_kv, head_size)
-
-        logmask -- (batch, n_kv_heads, n_heads_per_kv, n_query, n_kv)
-
-        kv_weight -- (batch, n_kv_heads, n_heads_per_kv, n_query) | ()
-                  -- 1.0 for regular attention (no reallocation)
-
-        mean_value -- (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
-        """
-        scores = (query.div(query.shape[-1] ** 0.5) @ key.transpose(-1, -2)).add_(
-            logmask
-        )
-        weights = torch.softmax(scores, -1, dtype=torch.float32).to(value.dtype)
-        # Value-mixing with reallocation
-        weights *= kv_weight[..., None]
-        output = weights @ value
-        output += (1 - kv_weight[..., None]) * mean_value
-        return output, weights
-
-    def forward(
-        self, query: Tensor, key: Tensor, value: Tensor, logmask: Tensor
-    ) -> Tuple[Tensor, Tensor]:
-        """Preprocess (key, value, mask) for ANN attention.
-
-        query -- (batch, n_heads, 1, head_size)
-
-        key -- (batch, n_kv_heads, seq, head_size)
-
-        value -- (batch, n_kv_heads, seq, head_size)
-
-        logmask -- (batch, n_heads, 1, seq)
-
-        returns -- (output, weights)
-                   output -- (batch, n_heads, 1, head_size)
-                   weights -- (batch, n_heads, 1, seq)
-        """
-        batch, n_kv_heads, seq, head_size = key.shape
-        n_heads_per_kv = query.shape[1] // n_kv_heads
-
-        # Group by KV head
-        query, key, value, logmask = map(
-            partial(torch.unflatten, dim=1, sizes=(n_kv_heads, -1)),
-            [query, key, value, logmask],
-        )
-
-        assert query.shape == (batch, n_kv_heads, n_heads_per_kv, 1, head_size)
-        assert key.shape == (batch, n_kv_heads, 1, seq, head_size)
-        assert value.shape == (batch, n_kv_heads, 1, seq, head_size)
-        assert logmask.shape == (batch, n_kv_heads, n_heads_per_kv, 1, seq)
-
-        # Calculate an approximate score for each (query, key) pair
-        # shape -- (batch, n_kv_heads, n_heads_per_kv, 1, seq)
-        score = (self.score(query, key) + logmask).float()
-        seq_len = key.shape[-2]
-
-        sparsity = self.settings.sparsity
-        valid_len = int((1 - sparsity) * seq_len)
-        if valid_len % 2 == 1:
-            valid_len += 1
-        half_valid_len = int(valid_len / 2)
-        # Set the score of local keys (+1 current) to max
-        causal_index = sparse_attention.causal_index(logmask)
-        is_local = (0 <= causal_index) & (causal_index < half_valid_len + 1)
-        topk_score = score.masked_fill(is_local, torch.finfo(score.dtype).max).sum(
-            dim=2, keepdim=True
-        )
-        # print("half_valid_len", half_valid_len)
-        # print("valid_len", valid_len)
-        # Find max-score keys (note: +1 because the current token's k comes "for free")
-        indices = topk_score.topk(
-            min(valid_len, score.shape[-1]), -1
-        ).indices  # (batch, n_kv_heads, 1, 1, k+1)
-
-        if self.debug_indices is not None:
-            self.debug_indices.append(indices)
-
-        # Optional "mean_value" kv
-        # Note: assumes same logmask for all heads
-        value_mask = (
-            logmask[:, :, :1].squeeze(-2).unsqueeze(-1).exp()
-        )  # (batch, n_kv_heads, 1, seq, 1)
-        mean_value = (
-            (value * value_mask)
-            .sum(-2, dtype=torch.float32, keepdim=True)
-            .div_(value_mask.sum(-2, dtype=torch.float32, keepdim=True))
-            .to(value.dtype)
-        )  # (batch, n_kv_heads, 1, 1, 1)
-        kv_weight = torch.tensor(1.0, device=query.device)
-        if self.settings.reallocate_to_mean_value:
-            kv_weight = (
-                gather(torch.softmax(score, -1), -1, indices)  # no need to expand here
-                .sum(-1)
-                .to(value.dtype)
-            )  # (batch, n_kv_heads, n_heads_per_kv, 1)
-
-        # Slice key, value, logmask for attention
-        kv_indices = indices.squeeze(-2).unsqueeze(-1)  # (batch, n_kv_heads, 1, k+1, 1)
-        output, weights = self._attention(
-            query,
-            gather(key, -2, kv_indices),
-            gather(value, -2, kv_indices),
-            gather(logmask, -1, indices),
-            kv_weight=kv_weight,
-            mean_value=mean_value,
-        )
-        # Note: expand indices as scatter does not broadcast (!)
-        return output.flatten(1, 2), torch.zeros_like(logmask).scatter(
-            -1, indices.expand_as(weights), weights
-        ).flatten(1, 2)
+        self.global_stats = global_stats
 
 
 Model = Union[
@@ -299,11 +159,94 @@ Model = Union[
 
 
 class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
-    def __init__(self, config: GPTNeoXConfig, settings: Settings):
+    def __init__(self, config: GPTNeoXConfig):
         utility.check_transformers_version(type(self))
         super().__init__(config)
-        self.ann = AnnAttention(settings, self.num_attention_heads, self.head_size)
-        print("FIXED!!!")
+
+    def _modified_attn(self, query, key, value, attention_mask=None, head_mask=None):
+        # q, k, v: [bs, num_attention_heads, seq_len, attn_head_size]
+        # compute causal mask from causal mask buffer
+        raw_value_file = "dense_raw_value_debug.pt"
+        # import os
+        # if not os.path.exists(raw_value_file):
+        #     torch.save(value, raw_value_file)
+        # raw_query_file = "dense_raw_query_debug.pt"
+        # if not os.path.exists(raw_query_file):
+        #     torch.save(query, raw_query_file)
+        # raw_key_file = "dense_raw_key_debug.pt"
+        # if not os.path.exists(raw_key_file):
+        #     torch.save(key, raw_key_file)
+
+        batch_size, num_attention_heads, query_length, attn_head_size = query.size()
+        key_length = key.size(-2)
+
+        # dynamically increase the causal mask with the key length, if needed.
+        if key_length > self.bias.shape[-1]:
+            self._init_bias(key_length, device=key.device)
+        causal_mask = self.bias[
+            :, :, key_length - query_length : key_length, :key_length
+        ]
+
+        query = query.view(
+            batch_size * num_attention_heads, query_length, attn_head_size
+        )
+        key = key.view(batch_size * num_attention_heads, key_length, attn_head_size)
+        attn_scores = torch.zeros(
+            batch_size * num_attention_heads,
+            query_length,
+            key_length,
+            dtype=query.dtype,
+            device=key.device,
+        )
+        attn_scores = torch.baddbmm(
+            attn_scores,
+            query,
+            key.transpose(1, 2),
+            beta=1.0,
+            alpha=self.norm_factor,
+        )
+        attn_scores = attn_scores.view(
+            batch_size, num_attention_heads, query_length, key_length
+        )
+
+        mask_value = torch.finfo(attn_scores.dtype).min
+        # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
+        # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
+        mask_value = torch.tensor(mask_value, dtype=attn_scores.dtype).to(
+            attn_scores.device
+        )
+        attn_scores = torch.where(causal_mask, attn_scores, mask_value)
+
+        if attention_mask is not None:
+            # Apply the attention mask
+            attn_scores = attn_scores + attention_mask
+
+        attn_weights = nn.functional.softmax(attn_scores, dim=-1)
+        attn_weights = attn_weights.to(value.dtype)
+
+        # Mask heads if we want to
+        if head_mask is not None:
+            attn_weights = attn_weights * head_mask
+
+        attn_weights = self.attention_dropout(attn_weights)
+        # file_name = "dense_weights_debug.pt"
+        # # save only when this file does not exist
+        # import os
+
+        # if not os.path.exists(file_name):
+        #     torch.save(attn_weights, file_name)
+        attn_output = torch.matmul(attn_weights, value)
+        # value_file = "dense_value_debug.pt"
+        # save only when this file does not exist
+        # if not os.path.exists(value_file):
+            # torch.save(value, value_file)
+
+        # output_name = "dense_output_debug.pt"
+        # if not os.path.exists(output_name):
+            # torch.save(attn_output, output_name)
+        # exit(1)
+        return attn_output, attn_weights
+
     def _attn(
         self,
         query: Tensor,
@@ -315,13 +258,18 @@ class GPTNeoXAttentionWithANN(GPTNeoXAttention):  # type:ignore[misc]
         assert attention_mask is not None
         assert head_mask is None
 
+        # query shape -- (batch, n_heads, token_length, head_size)
+        # key shape -- (batch, n_heads, kv_length, head_size)
+        # value shape -- (batch, n_heads, kv_length, head_size)
+        # attention_mask shape -- (batch, n_heads, token_length, kv_length)
         # Only enable ANN during autoregressive generation
         if query.shape[-2] == 1:
-            return self.ann(  # type:ignore[no-any-return]
+            return self._modified_attn(  # type:ignore[no-any-return]
                 query,
                 key,
                 value,
-                attention_mask.broadcast_to(key.unsqueeze(-3).shape[:-1]),
+                attention_mask,
+                head_mask,
             )
 
         return super()._attn(  # type:ignore[no-any-return]
@@ -336,7 +284,6 @@ class LlamaAttentionWithANN(llama_attention.LlamaAttention):
         utility.check_transformers_version(type(self))
         super().__init__(config, layer_idx)
         self.settings = settings
-        self.ann = AnnAttention(settings, self.num_key_value_heads, self.head_dim)
 
     def _attn(
         self,
@@ -346,6 +293,12 @@ class LlamaAttentionWithANN(llama_attention.LlamaAttention):
         logmask: Tensor,
     ) -> Tuple[Tensor, Tensor]:
         if query.shape[-2] == 1:
+            print("Using ANN for LlamaAttentionWithANN")
+            print("Query shape:", query.shape)
+            print("Key shape:", key.shape)
+            print("Value shape:", value.shape)
+            print("Logmask shape:", logmask.shape)
+
             return self.ann(  # type:ignore[no-any-return]
                 query,
                 key,
@@ -363,7 +316,6 @@ class GemmaAttentionWithANN(gemma_attention.GemmaAttention):
         utility.check_transformers_version(type(self))
         super().__init__(config, layer_idx)
         self.settings = settings
-        self.ann = AnnAttention(settings, self.num_heads, self.head_dim)
 
     def _attn(
         self, query: Tensor, key: Tensor, value: Tensor, logmask: Tensor
@@ -386,7 +338,6 @@ class MistralAttentionWithANN(mistral_attention.MistralAttention):
         utility.check_transformers_version(type(self))
         super().__init__(config, layer_idx)
         self.settings = settings
-        self.ann = AnnAttention(settings, self.num_key_value_heads, self.head_dim)
 
     def _attn(
         self, query: Tensor, key: Tensor, value: Tensor, logmask: Tensor
@@ -402,17 +353,29 @@ class MistralAttentionWithANN(mistral_attention.MistralAttention):
         return super()._attn(query, key, value, logmask)
 
 
-def convert(model: Model, settings: Settings) -> Model:
+def convert(model: Model) -> Model:
     """Convert a model to use KV cache compression using ANN."""
+    print("Dynamic!!!")
 
     def _replace(m: nn.Module) -> Optional[nn.Module]:
         if isinstance(m, GPTNeoXAttention):
-            return GPTNeoXAttentionWithANN(model.config, settings)
+            return GPTNeoXAttentionWithANN(
+                model.config,
+            )
         if isinstance(m, LlamaAttention):
-            return LlamaAttentionWithANN(model.config, m.layer_idx, settings)
+            return LlamaAttentionWithANN(
+                model.config,
+                m.layer_idx,
+            )
         if isinstance(m, MistralAttention):
-            return MistralAttentionWithANN(model.config, m.layer_idx, settings)
+            return MistralAttentionWithANN(
+                model.config,
+                m.layer_idx,
+            )
         if isinstance(m, GemmaAttention):
-            return GemmaAttentionWithANN(model.config, m.layer_idx, settings)
+            return GemmaAttentionWithANN(
+                model.config,
+                m.layer_idx,
+            )
 
     return utility.convert_module(model, _replace)

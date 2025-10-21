@@ -124,6 +124,9 @@ class Settings:
     sparsity: float
     score: ScoreSettings
     global_stats: Optional[dict] = None
+    enable_local_k: bool = False
+    enable_max_k: bool = False
+    max_k: Optional[float] = None
 
     def __init__(
         self,
@@ -133,6 +136,9 @@ class Settings:
         sparsity: float,
         score: Union[ScoreSettings, str],
         global_stats: Optional[dict],
+        enable_local_k: bool = False,
+        enable_max_k: bool = False,
+        max_k: Optional[float] = None,
         **args: Any,
     ):
         if isinstance(score, str):
@@ -141,9 +147,9 @@ class Settings:
             ]
             score_settings: ScoreSettings = ctor(**args)
         else:
-            assert not args, (
-                "ann_attention.Setting only accepts **args when `score` is a string"
-            )
+            assert (
+                not args
+            ), "ann_attention.Setting only accepts **args when `score` is a string"
             score_settings = score
         self.k = k
         self.local_k = local_k
@@ -151,6 +157,9 @@ class Settings:
         self.reallocate_to_mean_value = reallocate_to_mean_value
         self.score = score_settings
         self.global_stats = global_stats
+        self.enable_local_k = enable_local_k
+        self.enable_max_k = enable_max_k
+        self.max_k = max_k
 
 
 class AnnAttention(nn.Module):
@@ -189,19 +198,26 @@ class AnnAttention(nn.Module):
         scores = (query.div(query.shape[-1] ** 0.5) @ key.transpose(-1, -2)).add_(
             logmask
         )
-        weights = torch.softmax(scores, -1, dtype=torch.float32).to(value.dtype)
 
+        weights = torch.softmax(scores, -1, dtype=torch.float32).to(value.dtype)
+        # save weights to file for debugging
+        # file_name = "dynamic_weight_debug.pt"
+        # # save only when this file does not exist
+        # import os
+        # if not os.path.exists(file_name):
+        #     torch.save(weights, file_name)
         # 对 weights 做排序，选出累加值大于 threshold 的前 n 个 token
         orig_shape = weights.shape
         batch, n_kv_heads, n_heads_per_kv, n_query, n_kv = weights.shape
         assert n_query == 1, "Only support n_query == 1 for simplicity"
         flat_weights = weights.reshape(-1, n_kv)  # [B*H*Hk*Q, K]
         mask = torch.zeros_like(flat_weights, dtype=torch.bool)
-        selected_weight_sum = torch.zeros(
-            flat_weights.size(0), device=weights.device, dtype=weights.dtype
-        )
+        # selected_weight_sum = torch.zeros(
+        #     flat_weights.size(0), device=weights.device, dtype=weights.dtype
+        # )
         selected_indices = []
-        header_selected_len = []
+        header_selected_len = []            
+    
         for i in range(flat_weights.size(0)):
             w = flat_weights[i]
             sorted_w, idx = torch.sort(w, descending=True)
@@ -209,44 +225,82 @@ class AnnAttention(nn.Module):
             n = (cumsum >= threshold).nonzero(as_tuple=True)[0]
             n = n[0].item() + 1 if len(n) > 0 else len(sorted_w)
             header_selected_len.append(n)
-            if global_stats is not None:
-                global_stats["n_selected"] += n
-                global_stats["total_tokens"] += len(sorted_w)
+
+            # always keep recent 16 tokens
+            if self.settings.enable_local_k:
+                mask[i, -16:] = True
+            if self.settings.enable_max_k:
+                max_k_rate = self.settings.max_k if self.settings.max_k is not None else 0.1
+                max_k = int(n_kv * max_k_rate)
+                if n > max_k:
+                    n = max_k
 
             mask[i, idx[:n]] = True
-            selected_weight_sum[i] = sorted_w[:n].sum()
+            assert len(sorted_w) == n_kv
+            if global_stats is not None:
+                if self.settings.enable_local_k:
+                    total_num = 16
+                    for i in idx[:n]:
+                        if i >= n_kv - 16:
+                            continue
+                        total_num += 1
+                    global_stats["n_selected"] += total_num
+                    global_stats["total_tokens"] += n_kv
+                else:
+                    global_stats["n_selected"] += n
+                    global_stats["total_tokens"] += n_kv
+
+            # selected_weight_sum[i] = sorted_w[:n].sum()
             selected_indices.append(idx[:n])
 
         # 还原mask形状
         mask = mask.view(orig_shape)
         pruned_weights = weights * mask
+        # file_name= "dynamic_pruned_weight_debug.pt"
+        # # save only when this file does not exist
+        # if not os.path.exists(file_name):
+        #     torch.save(pruned_weights, file_name)
         pruned_weights_sum = pruned_weights.sum(dim=-1, keepdim=True) + 1e-8
         # print(pruned_weights_sum)
         # print(selected_weight_sum)
         # todo, don't normalize.
         pruned_weights = pruned_weights / pruned_weights_sum
-
+        # file_name = "dynamic_pruned_normalized_weight_debug.pt"
+        # save only when this file does not exist
+        # if not os.path.exists(file_name):
+        # torch.save(pruned_weights, file_name)
         # 计算 mean_value: (batch, n_kv_heads, n_heads_per_kv, n_query, head_size)
         # value: (batch, n_kv_heads, 1, n_kv, head_size)
         # logmask: (batch, n_kv_heads, n_heads_per_kv, n_query, n_kv)
         # 取 logmask 的 exp 得到 mask
-        value_mask = (
-            logmask[:, :, :1].squeeze(-2).unsqueeze(-1).exp()
-        )  # (batch, n_kv_heads, 1, seq, 1)
-        mean_value = (
-            (value * value_mask)
-            .sum(-2, dtype=torch.float32, keepdim=True)
-            .div_(value_mask.sum(-2, dtype=torch.float32, keepdim=True))
-            .to(value.dtype)
-        )  # (batch, n_kv_heads, 1, 1, 1)
+        # value_mask = (
+        #     logmask[:, :, :1].squeeze(-2).unsqueeze(-1).exp()
+        # )  # (batch, n_kv_heads, 1, seq, 1)
+        # mean_value = (
+        #     (value * value_mask)
+        #     .sum(-2, dtype=torch.float32, keepdim=True)
+        #     .div_(value_mask.sum(-2, dtype=torch.float32, keepdim=True))
+        #     .to(value.dtype)
+        # )  # (batch, n_kv_heads, 1, 1, 1)
 
         # kv_weight: (batch, n_kv_heads, n_heads_per_kv, n_query)
-        kv_weight = selected_weight_sum.view(batch, n_kv_heads, n_heads_per_kv, n_query)
+        # kv_weight = selected_weight_sum.view(batch, n_kv_heads, n_heads_per_kv, n_query)
 
         # Value-mixing with reallocation
         # pruned_weights = pruned_weights * kv_weight[..., None]
         output = pruned_weights @ value
+        # print output
+        # file_name = "dynamic_output_debug.pt"
+        # # save only when this file does not exist
+        # if not os.path.exists(file_name):
+        #     torch.save(output, file_name)
         # output += (1 - kv_weight[..., None]) * mean_value
+
+        # value_file = "dynamic_value_debug.pt"
+        # # save only when this file does not exist
+        # if not os.path.exists(value_file):
+        #     torch.save(value, value_file)
+
         return output, pruned_weights
 
     def forward(
@@ -270,6 +324,17 @@ class AnnAttention(nn.Module):
                    output -- (batch, n_heads, 1, head_size)
                    weights -- (batch, n_heads, 1, seq)
         """
+        # raw_value_file= "dynamic_raw_value_debug.pt"
+        # import os
+        # if not os.path.exists(raw_value_file):
+        #     torch.save(value, raw_value_file)
+        # raw_key_file= "dynamic_raw_key_debug.pt"
+        # if not os.path.exists(raw_key_file):
+        #     torch.save(key, raw_key_file)
+        # raw_query_file= "dynamic_raw_query_debug.pt"
+        # if not os.path.exists(raw_query_file):
+        #     torch.save(query, raw_query_file)
+
         batch, n_kv_heads, seq, head_size = key.shape
         n_heads_per_kv = query.shape[1] // n_kv_heads
         # print("logmask shape:", logmask.shape)

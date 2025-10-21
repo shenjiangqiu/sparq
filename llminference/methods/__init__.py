@@ -8,4 +8,5 @@ from . import (  # noqa: F401
     quantisation,
     sparse_attention,
     dynamic_attention,
+    dense_attention,
 )

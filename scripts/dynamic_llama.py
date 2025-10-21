@@ -2,11 +2,13 @@
 import llminference.experiments as xp
 
 global_results = []
-for sparsity in [i / 100 for i in range(98, 70, -2)]:
+for sparsity in [i / 1000 for i in range(850, 700, -10)]:
+    print("Running dynamic with sparsity:", sparsity)
+    global_stats = {"n_selected": 0, "total_tokens": 0}
     out = xp.run_one(
         xp.Experiment(
             "test",
-            task=xp.Task("wikitext_bpc", shots=0, samples=100, confusion_contexts=0),
+            task=xp.Task("cnn_dailymail", shots=0, samples=20, confusion_contexts=0),
             model="EleutherAI/pythia-410m",
             execution=xp.Execution(
                 device="cuda:0",
@@ -16,22 +18,28 @@ for sparsity in [i / 100 for i in range(98, 70, -2)]:
                 wandb=False,
             ),
             sparsity=xp.Sparsity(
-                "fixed",
+                "dynamic",
                 k=64,
                 local_k=16,
                 score="sparse_q",
                 rank=16,
-                reallocate_to_mean_value=False,
+                reallocate_to_mean_value=True,
                 sparsity=sparsity,
+                global_stats=global_stats,
             ),
         )
     )
 
     print({k: v for k, v in out.items() if k not in {"model_config", "results"}})
-    global_results.append((sparsity, out["bpc"]))
+    print(global_stats)
+    print(
+        "real_sparsity:", 1 - global_stats["n_selected"] / global_stats["total_tokens"]
+    )
+    real_sparsity = 1 - global_stats["n_selected"] / global_stats["total_tokens"]
+    global_results.append((real_sparsity, out["bpc"]))
+    print(global_results)
     del out
 
-# %%
 print(global_results)
 
 # %%

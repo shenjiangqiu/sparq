@@ -143,7 +143,8 @@ class SparsityMethods:
 
     @staticmethod
     def dense(model: PreTrainedModel) -> PreTrainedModel:
-        return model
+        from .methods import dense_attention
+        return dense_attention.convert(model)
 
     @staticmethod
     def sparse_v(model: PreTrainedModel, **settings: Any) -> PreTrainedModel:

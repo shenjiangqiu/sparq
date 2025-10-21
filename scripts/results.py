@@ -1,76 +1,57 @@
 # %%
-dynamic_results = [
-    (0.98, 1.8017578125, {"n_selected": 8602535, "total_tokens": 39611520}),
-    (0.96, 1.7744140625, {"n_selected": 6070678, "total_tokens": 39611520}),
-    (0.94, 1.7822265625, {"n_selected": 4770621, "total_tokens": 39611520}),
-    (0.92, 1.7880859375, {"n_selected": 3941289, "total_tokens": 39611520}),
-]
-dynamic = 1.72802734375
-dense = 1.7744140625
-
-sparsity = [
-    1 - stats["n_selected"] / stats["total_tokens"] for _, _, stats in dynamic_results
-]
-print(sparsity)
-
-fixed_results = [
-    (0.98, 1.90947265625),
-    (0.96, 1.869287109375),
-    (0.94, 1.85927734375),
-    (0.92, 1.85419921875),
-    (0.9, 1.85146484375),
-    (0.88, 1.848681640625),
-    (0.86, 1.851318359375),
-    (0.84, 1.84814453125),
-    (0.82, 1.84892578125),
-    (0.8, 1.84765625),
-    (0.78, 1.846484375),
-    (0.76, 1.8490234375),
-    (0.74, 1.84560546875),
-    (0.72, 1.845751953125),
-]
-
-
-sparq = [
-    (0.98, 2.077294921875),
-    (0.96, 1.996728515625),
-    (0.94, 1.962548828125),
-    (0.92, 1.945654296875),
-    (0.9, 1.930615234375),
-    (0.88, 1.915234375),
-    (0.86, 1.912548828125),
-    (0.84, 1.910498046875),
-    (0.82, 1.907177734375),
-    (0.8, 1.90654296875),
-    (0.78, 1.903369140625),
-    (0.76, 1.89404296875),
-    (0.74, 1.8998046875),
-    (0.72, 1.895849609375),
-]
-
 # ...existing code...
 import os
 import matplotlib.pyplot as plt
 
 
+dynamic_back = [
+    (0.6585542211529136, 1.8501953125),
+    (0.7677675198084811, 1.846142578125),
+    (0.8143381552418629, 1.847119140625),
+    (0.8458122171724369, 1.847607421875),
+    (0.945640463863051, 1.85751953125),
+    (0.9488175716739701, 1.858740234375),
+    (0.951660125895851, 1.86279296875),
+    (0.9543265958911487, 1.861328125),
+    (0.9566399894927561, 1.86435546875),
+    (0.9589472473386382, 1.8650390625)
+]
+dense = 1.844677734375
+
+
+fixed_results = [
+    (0.98, 1.876708984375),
+    (0.96, 1.854443359375),
+    (0.94, 1.853857421875),
+    (0.92, 1.847216796875),
+    (0.9, 1.852099609375),
+    (0.88, 1.848876953125),
+    (0.86, 1.848388671875),
+    (0.84, 1.849755859375),
+    (0.82, 1.8458984375),
+    (0.8, 1.848828125),
+    (0.78, 1.847998046875),
+    (0.76, 1.846923828125),
+    (0.74, 1.848828125),
+    (0.72, 1.846630859375),
+]
+
+
 # %%
 def plot_valid_vs_ppl():
     # dynamic: valid rate = n_selected / total_tokens
-    dyn_valid = [
-        stats["n_selected"] / stats["total_tokens"] for _, _, stats in dynamic_results
-    ]
-    dyn_ppl = [ppl for _, ppl, _ in dynamic_results]
-
+    dyn_valid = [1 - valid for valid, _ in dynamic_back]
+    dyn_ppl = [ppl for _, ppl in dynamic_back]
     fixed_valid = [1 - valid for valid, _ in fixed_results]
     fixed_ppl = [ppl for _, ppl in fixed_results]
 
-    sparq_valid = [1 - valid for valid, _ in sparq]
-    sparq_ppl = [ppl for _, ppl in sparq]
+    # sparq_valid = [1 - valid for valid, _ in sparq]
+    # sparq_ppl = [ppl for _, ppl in sparq]
 
     plt.figure(figsize=(7, 4.5))
     plt.plot(dyn_valid, dyn_ppl, marker="o", label="dynamic")
     plt.plot(fixed_valid, fixed_ppl, marker="s", label="fixed")
-    plt.plot(sparq_valid, sparq_ppl, marker="^", label="sparq")
+    # plt.plot(sparq_valid, sparq_ppl, marker="^", label="sparq")
 
     # add horizontal line for dense ppl
     plt.axhline(
