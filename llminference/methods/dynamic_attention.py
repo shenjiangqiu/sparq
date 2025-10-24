@@ -149,9 +149,9 @@ class Settings:
             ]
             score_settings: ScoreSettings = ctor(**args)
         else:
-            assert (
-                not args
-            ), "ann_attention.Setting only accepts **args when `score` is a string"
+            assert not args, (
+                "ann_attention.Setting only accepts **args when `score` is a string"
+            )
             score_settings = score
         self.k = k
         self.local_k = local_k
@@ -215,7 +215,7 @@ class AnnAttention(nn.Module):
         """
         # 现在不用这个版本了
         exit(-1)
-        
+
         scores = (query.div(query.shape[-1] ** 0.5) @ key.transpose(-1, -2)).add_(
             logmask
         )
@@ -384,7 +384,7 @@ class AnnAttention(nn.Module):
 
         # ===== 创建mask（向量化）=====
         # 使用gather创建mask
-        batch_indices = torch.arange(flat_weights.size(0), device=flat_weights.device)
+        # batch_indices = torch.arange(flat_weights.size(0), device=flat_weights.device)
         mask = torch.zeros_like(flat_weights, dtype=torch.bool)
 
         for i in range(flat_weights.size(0)):

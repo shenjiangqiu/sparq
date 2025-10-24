@@ -3,7 +3,7 @@
 import os
 import matplotlib.pyplot as plt
 
-dynamic_non_realloc = [
+dynamic_new_only_sparsity = [
     (0.9443807817127845, 1.882099609375),
     (0.9476726836110394, 1.883291015625),
     (0.9505444596359117, 1.8828125),
@@ -20,7 +20,7 @@ dynamic_non_realloc = [
     (0.9710976631619818, 1.90546875),
     (0.9723512591108872, 1.906796875),
 ]
-dynamic_non_vec_realloc = [
+dynamic_old_only_sparsity = [
     (0.9443432015452518, 1.882216796875),
     (0.9476428787070152, 1.881474609375),
     (0.950495663556666, 1.882841796875),
@@ -38,7 +38,7 @@ dynamic_non_vec_realloc = [
     (0.9723656286603145, 1.90646484375),
 ]
 
-dynamic_vec_reall = [
+dynamic_new_withmean = [
     (0.9480591390421096, 1.885556640625),
     (0.9513739442956359, 1.88599609375),
     (0.9542218880168156, 1.888486328125),
@@ -57,7 +57,7 @@ dynamic_vec_reall = [
 ]
 
 
-dynamic_back = [
+dynamic_old_sparsity = [
     (0.9443432015452518, 1.882216796875),
     (0.9476428787070152, 1.881474609375),
     (0.950495663556666, 1.882841796875),
@@ -98,47 +98,55 @@ fixed_results = [
 # %%
 def plot_valid_vs_ppl():
     # dynamic: valid rate = n_selected / total_tokens
-    dyn_valid = [1 - valid for valid, _ in dynamic_back]
-    dyn_ppl = [ppl for _, ppl in dynamic_back]
-    dyn_non_realloc_valid = [1 - valid for valid, _ in dynamic_non_realloc]
-    dyn_non_realloc_ppl = [ppl for _, ppl in dynamic_non_realloc]
-    dyn_non_vec_realloc_valid = [1 - valid for valid, _ in dynamic_non_vec_realloc]
-    dyn_non_vec_realloc_ppl = [ppl for _, ppl in dynamic_non_vec_realloc]
-    dyn_vec_realloc_valid = [1 - valid for valid, _ in dynamic_vec_reall]
-    dyn_vec_realloc_ppl = [ppl for _, ppl in dynamic_vec_reall]
+    # 老的实现，没有mean
+    dyn_old_sparsity_valid = [1 - valid for valid, _ in dynamic_old_sparsity]
+    dyn_old_sparsity_ppl = [2**bpc for _, bpc in dynamic_old_sparsity]
+    # 再次验证
+    dynamic_old_only_sparsity_valid = [
+        1 - valid for valid, _ in dynamic_old_only_sparsity
+    ]
+    dynamic_old_only_sparsity_ppl = [2**bpc for _, bpc in dynamic_old_only_sparsity]
+    # 新的没有mean
+    dynamic_new_only_sparsity_valid = [
+        1 - valid for valid, _ in dynamic_new_only_sparsity
+    ]
+    dynamic_new_only_sparsity_ppl = [2**bpc for _, bpc in dynamic_new_only_sparsity]
+    # 新的加上 mean
+    dynamic_new_withmean_valid = [1 - valid for valid, _ in dynamic_new_withmean]
+    dynamic_new_withmean_ppl = [2**bpc for _, bpc in dynamic_new_withmean]
 
     fixed_valid = [1 - valid for valid, _ in fixed_results]
-    fixed_ppl = [ppl for _, ppl in fixed_results]
+    fixed_ppl = [2**bpc for _, bpc in fixed_results]
 
     # sparq_valid = [1 - valid for valid, _ in sparq]
     # sparq_ppl = [ppl for _, ppl in sparq]
 
     plt.figure(figsize=(7, 4.5))
-    dyn_ppl_ppl = [2**ppl for ppl in dyn_ppl]
-    fixed_ppl_ppl = [2**ppl for ppl in fixed_ppl]
-    dyn_non_realloc_ppl_ppl = [2**ppl for ppl in dyn_non_realloc_ppl]
-    dyn_non_vec_realloc_ppl_ppl = [2**ppl for ppl in dyn_non_vec_realloc_ppl]
-    dyn_vec_realloc_ppl_ppl = [2**ppl for ppl in dyn_vec_realloc_ppl]
 
-    plt.plot(dyn_valid, dyn_ppl_ppl, marker="o", label="dynamic")
-    plt.plot(fixed_valid, fixed_ppl_ppl, marker="s", label="fixed")
     plt.plot(
-        dyn_non_realloc_valid,
-        dyn_non_realloc_ppl_ppl,
+        dyn_old_sparsity_valid,
+        dyn_old_sparsity_ppl,
+        marker="o",
+        label="old impl without mean",
+    )
+    plt.plot(fixed_valid, fixed_ppl, marker="s", label="fixed")
+    plt.plot(
+        dynamic_old_only_sparsity_valid,
+        dynamic_old_only_sparsity_ppl,
         marker="^",
-        label="dynamic non-realloc",
+        label="old impl without mean(validated)",
     )
     plt.plot(
-        dyn_non_vec_realloc_valid,
-        dyn_non_vec_realloc_ppl_ppl,
+        dynamic_new_only_sparsity_valid,
+        dynamic_new_only_sparsity_ppl,
         marker="v",
-        label="dynamic non-vec realloc",
+        label="new impl without mean",
     )
     plt.plot(
-        dyn_vec_realloc_valid,
-        dyn_vec_realloc_ppl_ppl,
+        dynamic_new_withmean_valid,
+        dynamic_new_withmean_ppl,
         marker="D",
-        label="dynamic vec realloc",
+        label="new impl with mean",
     )
     # plt.plot(sparq_valid, sparq_ppl, marker="^", label="sparq")
     dense_ppl = 2**dense
