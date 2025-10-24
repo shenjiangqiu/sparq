@@ -23,9 +23,10 @@ for sparsity in [i / 1000 for i in range(850, 700, -10)]:
                 local_k=16,
                 score="sparse_q",
                 rank=16,
-                reallocate_to_mean_value=False,
+                reallocate_to_mean_value=True,
                 sparsity=sparsity,
                 global_stats=global_stats,
+                enable_vectorized=False,
             ),
         )
     )

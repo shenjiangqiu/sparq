@@ -1,25 +1,26 @@
-
+# %%
 # float 32 vs float 16
 import llminference as L
 import llminference.experiments as xp
 import torch
-torch.set_num_threads(32)
-out = xp.run_one(xp.Experiment(
-    "test",
-    task=xp.Task("wikitext_bpc", shots=0, samples=10,confusion_contexts=0),
-    model="EleutherAI/pythia-410m",
-    execution=xp.Execution(device="cuda", dtype="float32", batch_size=10, pipeline_stages=1, wandb=False),
-    sparsity=xp.Sparsity("dense"),
-))
-display({k: v for k, v in out.items() if k not in {"model_config", "results"}})
-del out
 
-out = xp.run_one(xp.Experiment(
-    "test",
-    task=xp.Task("wikitext_bpc", shots=0, samples=10,confusion_contexts=0),
-    model="EleutherAI/pythia-410m",
-    execution=xp.Execution(device="cuda", dtype="float16", batch_size=10, pipeline_stages=1, wandb=False),
-    sparsity=xp.Sparsity("dense"),
-))
-display({k: v for k, v in out.items() if k not in {"model_config", "results"}})
-del out
+a = torch.tensor(
+    [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0], [1, 2, 9]], dtype=torch.float16
+)
+score = a.softmax(dim=-1)
+print(score[0][1] / score[0][0])
+print(score[3][1] / score[3][0])
+print("score float16:", score)
+# %%
+soreted_score, idx = score.sort(dim=-1, descending=True)
+print("sorted score float16:", soreted_score)
+# %%
+accumulate_sum = soreted_score.cumsum(dim=-1)
+print("accumulate sum float16:", accumulate_sum)
+# %%
+masked_sum = accumulate_sum >= 0.9
+print("masked sum float16:", masked_sum)
+# %%
+max_idx = masked_sum.long().argmax(dim=-1)
+print("max idx float16:", max_idx)
+# %%
