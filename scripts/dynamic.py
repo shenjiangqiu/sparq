@@ -26,7 +26,7 @@ print(
 )
 
 global_results = []
-for sparsity in [i / 1000 for i in range(700, 500, -20)]:
+for sparsity in [i / 1000 for i in range(995, 900, -5)]:
     print("Running dynamic with sparsity:", sparsity)
     global_stats = {"n_selected": 0, "total_tokens": 0}
     out = xp.run_one(

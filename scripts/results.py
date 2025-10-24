@@ -74,6 +74,38 @@ dynamic_old_sparsity = [
     (0.9711042631758362, 1.90375),
     (0.9723656286603145, 1.90646484375),
 ]
+
+d_32_16_false = [
+    (0.9799434858220435, 1.900927734375),
+    (0.980268770173462, 1.899521484375),
+    (0.9805948783247688, 1.90435546875),
+    (0.980912188571484, 1.903408203125),
+    (0.9812287932592685, 1.905048828125),
+]
+d_32_16_true = [
+    (0.9812336057480613, 1.920859375),
+    (0.9815554807503525, 1.92591796875),
+    (0.9818824444097626, 1.933076171875),
+    (0.9822010405780316, 1.942470703125),
+    (0.9825060502875044, 1.9521875),
+    (0.9827990315366782, 1.96365234375),
+]
+d_64_32_false = [
+    (0.9649803725165896, 1.886513671875),
+    (0.9656296831192748, 1.887744140625),
+    (0.9662583301940972, 1.890185546875),
+    (0.9668523222353828, 1.8898828125),
+    (0.9674210653317473, 1.893291015625),
+]
+d_64_32_true = [
+    (0.9666411091087558, 1.905390625),
+    (0.9672480683780795, 1.9117578125),
+    (0.9678470901605744, 1.91701171875),
+    (0.9683987057064956, 1.927197265625),
+    (0.9689380119187015, 1.935498046875),
+    (0.9694428668482246, 1.94494140625),
+]
+
 dense = 1.872275390625
 
 
@@ -94,7 +126,10 @@ fixed_results = [
     (0.72, 1.874013671875),
 ]
 
-
+def get_sparsity_and_ppl(results):
+    sparsity = [1 - valid for valid, _ in results]
+    ppl = [2**bpc for _, bpc in results]
+    return sparsity, ppl
 # %%
 def plot_valid_vs_ppl():
     # dynamic: valid rate = n_selected / total_tokens
@@ -120,6 +155,10 @@ def plot_valid_vs_ppl():
 
     # sparq_valid = [1 - valid for valid, _ in sparq]
     # sparq_ppl = [ppl for _, ppl in sparq]
+    d_64_32_false_sparsity_valid, d_64_32_false_sparsity_ppl = get_sparsity_and_ppl(d_64_32_false)
+    d_64_32_true_sparsity_valid, d_64_32_true_sparsity_ppl = get_sparsity_and_ppl(d_64_32_true)
+    d_32_16_false_sparsity_valid, d_32_16_false_sparsity_ppl = get_sparsity_and_ppl(d_32_16_false)
+    d_32_16_true_sparsity_valid, d_32_16_true_sparsity_ppl = get_sparsity_and_ppl(d_32_16_true)
 
     plt.figure(figsize=(7, 4.5))
 
@@ -130,12 +169,7 @@ def plot_valid_vs_ppl():
         label="old impl without mean",
     )
     plt.plot(fixed_valid, fixed_ppl, marker="s", label="fixed")
-    plt.plot(
-        dynamic_old_only_sparsity_valid,
-        dynamic_old_only_sparsity_ppl,
-        marker="^",
-        label="old impl without mean(validated)",
-    )
+
     plt.plot(
         dynamic_new_only_sparsity_valid,
         dynamic_new_only_sparsity_ppl,
@@ -147,6 +181,31 @@ def plot_valid_vs_ppl():
         dynamic_new_withmean_ppl,
         marker="D",
         label="new impl with mean",
+    )
+    
+    plt.plot(
+        d_64_32_false_sparsity_valid,
+        d_64_32_false_sparsity_ppl,
+        marker="^",
+        label="d64-32 false",
+    )
+    plt.plot(
+        d_64_32_true_sparsity_valid,
+        d_64_32_true_sparsity_ppl,
+        marker=">",
+        label="d64-32 true",
+    )
+    plt.plot(
+        d_32_16_false_sparsity_valid,
+        d_32_16_false_sparsity_ppl,
+        marker="x",
+        label="d32-16 false",
+    )
+    plt.plot(
+        d_32_16_true_sparsity_valid,
+        d_32_16_true_sparsity_ppl,
+        marker="*",
+        label="d32-16 true",
     )
     # plt.plot(sparq_valid, sparq_ppl, marker="^", label="sparq")
     dense_ppl = 2**dense

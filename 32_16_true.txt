@@ -1,0 +1,44 @@
+Running dynamic with sparsity: 0.7
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.7, 'global_stats': {'n_selected': 91736198, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.920859375, 'duration': 1238.685997247696}
+{'n_selected': 91736198, 'total_tokens': 4888323072}
+real_sparsity: 0.9812336057480613
+[(0.9812336057480613, 1.920859375)]
+Running dynamic with sparsity: 0.68
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.68, 'global_stats': {'n_selected': 90162769, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.92591796875, 'duration': 1342.9014003276825}
+{'n_selected': 90162769, 'total_tokens': 4888323072}
+real_sparsity: 0.9815554807503525
+[(0.9812336057480613, 1.920859375), (0.9815554807503525, 1.92591796875)]
+Running dynamic with sparsity: 0.66
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.66, 'global_stats': {'n_selected': 88564465, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.933076171875, 'duration': 1341.8544805049896}
+{'n_selected': 88564465, 'total_tokens': 4888323072}
+real_sparsity: 0.9818824444097626
+[(0.9812336057480613, 1.920859375), (0.9815554807503525, 1.92591796875), (0.9818824444097626, 1.933076171875)]
+Running dynamic with sparsity: 0.64
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.64, 'global_stats': {'n_selected': 87007064, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.942470703125, 'duration': 1341.8602957725525}
+{'n_selected': 87007064, 'total_tokens': 4888323072}
+real_sparsity: 0.9822010405780316
+[(0.9812336057480613, 1.920859375), (0.9815554807503525, 1.92591796875), (0.9818824444097626, 1.933076171875), (0.9822010405780316, 1.942470703125)]
+Running dynamic with sparsity: 0.62
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.62, 'global_stats': {'n_selected': 85516078, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.9521875, 'duration': 1351.8619494438171}
+{'n_selected': 85516078, 'total_tokens': 4888323072}
+real_sparsity: 0.9825060502875044
+[(0.9812336057480613, 1.920859375), (0.9815554807503525, 1.92591796875), (0.9818824444097626, 1.933076171875), (0.9822010405780316, 1.942470703125), (0.9825060502875044, 1.9521875)]
+Running dynamic with sparsity: 0.6
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.6, 'global_stats': {'n_selected': 84083891, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.96365234375, 'duration': 1357.5338380336761}
+{'n_selected': 84083891, 'total_tokens': 4888323072}
+real_sparsity: 0.9827990315366782
+[(0.9812336057480613, 1.920859375), (0.9815554807503525, 1.92591796875), (0.9818824444097626, 1.933076171875), (0.9822010405780316, 1.942470703125), (0.9825060502875044, 1.9521875), (0.9827990315366782, 1.96365234375)]
+Running dynamic with sparsity: 0.58
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': True, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 32, 'local_k': 16, 'sparsity': 0.58, 'global_stats': {'n_selected': 82669493, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:0', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.975849609375, 'duration': 1355.8482866287231}
+{'n_selected': 82669493, 'total_tokens': 4888323072}
+real_sparsity: 0.9830883737055913
+[(0.9812336057480613, 1.920859375), (0.9815554807503525, 1.92591796875), (0.9818824444097626, 1.933076171875), (0.9822010405780316, 1.942470703125), (0.9825060502875044, 1.9521875), (0.9827990315366782, 1.96365234375), (0.9830883737055913, 1.975849609375)]
+Running dynamic with sparsity: 0.56
+Dynamic!!!

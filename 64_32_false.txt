@@ -1,2 +1,32 @@
 Running dynamic with sparsity: 0.7
 Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': False, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 64, 'local_k': 32, 'sparsity': 0.7, 'global_stats': {'n_selected': 171187253, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:1', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.886513671875, 'duration': 1260.9806327819824}
+{'n_selected': 171187253, 'total_tokens': 4888323072}
+real_sparsity: 0.9649803725165896
+[(0.9649803725165896, 1.886513671875)]
+Running dynamic with sparsity: 0.68
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': False, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 64, 'local_k': 32, 'sparsity': 0.68, 'global_stats': {'n_selected': 168013213, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:1', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.887744140625, 'duration': 1600.8681478500366}
+{'n_selected': 168013213, 'total_tokens': 4888323072}
+real_sparsity: 0.9656296831192748
+[(0.9649803725165896, 1.886513671875), (0.9656296831192748, 1.887744140625)]
+Running dynamic with sparsity: 0.66
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': False, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 64, 'local_k': 32, 'sparsity': 0.66, 'global_stats': {'n_selected': 164940183, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:1', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.890185546875, 'duration': 1589.9412598609924}
+{'n_selected': 164940183, 'total_tokens': 4888323072}
+real_sparsity: 0.9662583301940972
+[(0.9649803725165896, 1.886513671875), (0.9656296831192748, 1.887744140625), (0.9662583301940972, 1.890185546875)]
+Running dynamic with sparsity: 0.64
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': False, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 64, 'local_k': 32, 'sparsity': 0.64, 'global_stats': {'n_selected': 162036558, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:1', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.8898828125, 'duration': 1587.494078874588}
+{'n_selected': 162036558, 'total_tokens': 4888323072}
+real_sparsity: 0.9668523222353828
+[(0.9649803725165896, 1.886513671875), (0.9656296831192748, 1.887744140625), (0.9662583301940972, 1.890185546875), (0.9668523222353828, 1.8898828125)]
+Running dynamic with sparsity: 0.62
+Dynamic!!!
+{'name': 'test', 'task': {'name': 'wikitext_bpc', 'shots': 0, 'samples': 100, 'confusion_contexts': 0}, 'model': 'EleutherAI/pythia-410m', 'sparsity': {'name': 'dynamic', 'k': 64, 'score': 'sparse_q', 'rank': 16, 'enable_vectorized': True, 'reallocate_to_mean_value': False, 'enable_max_k': True, 'enable_local_k': True, 'max_k': 64, 'local_k': 32, 'sparsity': 0.62, 'global_stats': {'n_selected': 159256358, 'total_tokens': 4888323072}}, 'execution': {'device': 'cuda:1', 'dtype': 'float16', 'batch_size': 1, 'pipeline_stages': 1, 'wandb': False}, 'code_changes': {'ann-local-token-for-free': True, 'repetition-ignore-leading-space': True, 'forced-sample-no-specials': True, 'attn-implementation-eager': True, 'attn-scale-queries-before-matmul': True}, 'parameters': 405334016, 'count': 100, 'prefill_length': 1348.84, 'reference_length': 91.86, 'bpc': 1.893291015625, 'duration': 1599.5923345088959}
+{'n_selected': 159256358, 'total_tokens': 4888323072}
+real_sparsity: 0.9674210653317473
+[(0.9649803725165896, 1.886513671875), (0.9656296831192748, 1.887744140625), (0.9662583301940972, 1.890185546875), (0.9668523222353828, 1.8898828125), (0.9674210653317473, 1.893291015625)]
+Running dynamic with sparsity: 0.6
+Dynamic!!!
