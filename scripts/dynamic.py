@@ -8,8 +8,8 @@ local_k = None
 parser = argparse.ArgumentParser()
 parser.add_argument("--max-k", type=int, default=None)
 parser.add_argument("--local-k", type=int, default=None)
-parser.add_argument("--reallocate", type=bool, default=False)
-parser.add_argument("--gpu", type=bool, default=True)
+parser.add_argument("--reallocate", action="store_true", default=False)
+parser.add_argument("--gpu", action="store_true", default=False)
 args = parser.parse_args()
 
 max_k = args.max_k
