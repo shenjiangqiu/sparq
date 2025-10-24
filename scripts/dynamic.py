@@ -18,6 +18,12 @@ reallocate = args.reallocate
 gpu = args.gpu
 enable_max_k = max_k is not None
 enable_local_k = local_k is not None
+import sys
+
+print(
+    f"max_k: {max_k}, local_k: {local_k}, reallocate: {reallocate}, gpu: {gpu}",
+    file=sys.stderr,
+)
 
 global_results = []
 for sparsity in [i / 1000 for i in range(700, 500, -20)]:
