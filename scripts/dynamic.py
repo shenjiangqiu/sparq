@@ -9,19 +9,19 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--max-k", type=int, default=None)
 parser.add_argument("--local-k", type=int, default=None)
 parser.add_argument("--reallocate", action="store_true", default=False)
-parser.add_argument("--gpu", action="store_true", default=False)
+parser.add_argument("--device", type=str, default="cuda:0")
 args = parser.parse_args()
 
 max_k = args.max_k
 local_k = args.local_k
 reallocate = args.reallocate
-gpu = args.gpu
 enable_max_k = max_k is not None
 enable_local_k = local_k is not None
+device = args.device
 import sys
 
 print(
-    f"max_k: {max_k}, local_k: {local_k}, reallocate: {reallocate}, gpu: {gpu}",
+    f"max_k: {max_k}, local_k: {local_k}, reallocate: {reallocate}, device: {device}",
     file=sys.stderr,
 )
 
@@ -35,7 +35,7 @@ for sparsity in [i / 1000 for i in range(700, 500, -20)]:
             task=xp.Task("wikitext_bpc", shots=0, samples=100, confusion_contexts=0),
             model="EleutherAI/pythia-410m",
             execution=xp.Execution(
-                device="cuda:0" if gpu else "cpu",
+                device=device,
                 dtype="float16",
                 batch_size=1,
                 pipeline_stages=1,

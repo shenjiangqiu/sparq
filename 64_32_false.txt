@@ -1,0 +1,2 @@
+Running dynamic with sparsity: 0.7
+Dynamic!!!
